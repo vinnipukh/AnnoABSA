@@ -1,60 +1,65 @@
 [
-    {
-        "text": "The pasta was excellent and the service was very attentive.",
-        "label": [
-            {
-                "aspect_term": "pasta",
-                "aspect_category": "food quality",
-                "opinion_term": "excellent",
-                "sentiment_polarity": "positive"
-            },
-            {
-                "aspect_term": "service",
-                "aspect_category": "service general",
-                "opinion_term": "very attentive",
-                "sentiment_polarity": "positive"
-            }
-        ]
-    },
-    {
-        "text": "The atmosphere was romantic but the food was disappointing.",
-        "label": [
-            {
-                "aspect_term": "atmosphere",
-                "aspect_category": "ambience general",
-                "opinion_term": "romantic",
-                "sentiment_polarity": "positive"
-            },
-            {
-                "aspect_term": "food",
-                "aspect_category": "food quality",
-                "opinion_term": "disappointing",
-                "sentiment_polarity": "negative"
-            }
-        ]
-    },
-    {
-        "text": "The pizza was decent and the wine selection was good."
-    },
-    {
-        "text": "We waited over an hour for our table despite having a reservation."
-    },
-    {
-        "text": "The staff was incredibly rude and the music was way too loud."
-    },
-    {
-        "text": "The dessert menu was extensive but the prices were reasonable."
-    },
-    {
-        "text": "I loved the cozy ambiance and the friendly waitstaff."
-    },
-    {
-        "text": "The restaurant was clean and well-maintained throughout."
-    },
-    {
-        "text": "Parking was convenient and the location was perfect."
-    },
-    {
-        "text": "The menu offered great variety for different dietary needs."
-    }
+  {
+    "text": "The pizza was decent and the wine selection was good."
+  },
+  {
+    "text": "We waited over an hour for our table despite having a reservation."
+  },
+  {
+    "text": "The staff was incredibly rude!"
+  },
+  {
+    "text": "The dessert menu was extensive but the prices were reasonable."
+  },
+  {
+    "text": "I loved the cozy ambiance and the friendly waitstaff."
+  },
+  {
+    "text": "The restaurant was nice."
+  },
+  {
+    "text": "The hamburger was too expensive."
+  },
+  {
+    "text": "Very good!"
+  },
+  {
+    "text": "The service was terrible and the food was bad."
+  },
+  {
+    "text": "I had a wonderful ambience with excellent service."
+  },
+  {
+    "text": "The pasta was overcooked and the sauce was bland."
+  },
+  {
+    "text": "The restaurant had a great atmosphere and the staff was friendly."
+  },
+  {
+    "text": "The sushi was fresh and delicious."
+  },
+  {
+    "text": "The food was mediocre."
+  },
+  {
+    "text": "I enjoyed the live music while dining."
+  },
+  {
+    "text": "The restaurant was dirty and the staff was unprofessional."
+  },
+  {
+    "text": "The steak was cooked to perfection and the sides were tasty."
+  },
+  {
+    "text": "Good interior!"
+  },
+  {
+    "text": "The service was excellent and the food was delicious."
+  },
+  {
+    "text": "The restaurant was overcrowded"
+  },
+  {
+    "text": "The seafood was fresh and the presentation was beautiful."
+  }
 ]
