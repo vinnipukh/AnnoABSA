@@ -15,8 +15,10 @@ export interface ReviewComparisonData {
   translation?: string;
   label?: TripletItem[];
   aspect_category_list: string[];
-  deepseek_triplets: TripletItem[];
-  qwen_triplets: TripletItem[];
+  model_a_triplets: TripletItem[];
+  model_b_triplets: TripletItem[];
+  model_a_name?: string;
+  model_b_name?: string;
   agent_initial_reasoning: string;
 }
 

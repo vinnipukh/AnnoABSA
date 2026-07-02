@@ -11,12 +11,14 @@ const FALLBACK_DATA: ReviewComparisonData[] = [
     text: "4 tarafı cam olduğu için yeterince ısıtamıyorlar.",
     review_text: "4 tarafı cam olduğu için yeterince ısıtamıyorlar.",
     aspect_category_list: ["AMBIENCE#GENERAL", "RESTAURANT#GENERAL", "FOOD#QUALITY", "SERVICE#GENERAL"],
-    deepseek_triplets: [
-      { id: 'ds_0', aspect_term: 'NULL', aspect_category: 'AMBIENCE#GENERAL', sentiment_polarity: 'negative' }
+    model_a_triplets: [
+      { id: 'ma_0', aspect_term: 'NULL', aspect_category: 'AMBIENCE#GENERAL', sentiment_polarity: 'negative' }
     ],
-    qwen_triplets: [
-      { id: 'qw_0', aspect_term: 'NULL', aspect_category: 'AMBIENCE#GENERAL', sentiment_polarity: 'negative' }
+    model_b_triplets: [
+      { id: 'mb_0', aspect_term: 'NULL', aspect_category: 'AMBIENCE#GENERAL', sentiment_polarity: 'negative' }
     ],
+    model_a_name: "Model A",
+    model_b_name: "Model B",
     agent_initial_reasoning: "Cam duvarlar nedeniyle mekanın yeterince ısınamaması, doğrudan müşteri konforunu ve ambiyansı olumsuz etkilediği için AMBIENCE#GENERAL (negative) olarak etiketlenmelidir."
   },
   {
@@ -24,13 +26,15 @@ const FALLBACK_DATA: ReviewComparisonData[] = [
     text: "Üstelik fiyatlarda, yemeklerine nazaran uygun degil.",
     review_text: "Üstelik fiyatlarda, yemeklerine nazaran uygun degil.",
     aspect_category_list: ["FOOD#PRICES", "FOOD#QUALITY", "RESTAURANT#GENERAL", "SERVICE#GENERAL"],
-    deepseek_triplets: [
-      { id: 'ds_1', aspect_term: 'fiyatlarda', aspect_category: 'FOOD#PRICES', sentiment_polarity: 'negative' },
-      { id: 'ds_2', aspect_term: 'yemeklerine', aspect_category: 'FOOD#QUALITY', sentiment_polarity: 'negative' }
+    model_a_triplets: [
+      { id: 'ma_1', aspect_term: 'fiyatlarda', aspect_category: 'FOOD#PRICES', sentiment_polarity: 'negative' },
+      { id: 'ma_2', aspect_term: 'yemeklerine', aspect_category: 'FOOD#QUALITY', sentiment_polarity: 'negative' }
     ],
-    qwen_triplets: [
-      { id: 'qw_1', aspect_term: 'fiyatlarda', aspect_category: 'FOOD#PRICES', sentiment_polarity: 'negative' }
+    model_b_triplets: [
+      { id: 'mb_1', aspect_term: 'fiyatlarda', aspect_category: 'FOOD#PRICES', sentiment_polarity: 'negative' }
     ],
+    model_a_name: "Model A",
+    model_b_name: "Model B",
     agent_initial_reasoning: "Fiyatlar yemeklere göre uygun değil. Bu cümlede asıl eleştirilen nokta 'fiyatların yüksekliği' olduğu için FOOD#PRICES (negative) seçilmelidir. Yemeklerin kötü olduğu söylenmediği için FOOD#QUALITY eklenmemelidir."
   },
   {
@@ -38,25 +42,29 @@ const FALLBACK_DATA: ReviewComparisonData[] = [
     text: "Mekanin kalabalik olmasindan mi kaynakliydi bu dikkatsizlik anlam veremedim, bu kadar övgü almasina ragmen böyle olumsuz bir durum ilginç geldi.",
     review_text: "Mekanin kalabalik olmasindan mi kaynakliydi bu dikkatsizlik anlam veremedim, bu kadar övgü almasina ragmen böyle olumsuz bir durum ilginç geldi.",
     aspect_category_list: ["RESTAURANT#GENERAL", "SERVICE#GENERAL", "AMBIENCE#GENERAL"],
-    deepseek_triplets: [
-      { id: 'ds_3', aspect_term: 'durum', aspect_category: 'RESTAURANT#GENERAL', sentiment_polarity: 'negative' }
+    model_a_triplets: [
+      { id: 'ma_3', aspect_term: 'durum', aspect_category: 'RESTAURANT#GENERAL', sentiment_polarity: 'negative' }
     ],
-    qwen_triplets: [],
-    agent_initial_reasoning: "Mekanın kalabalık olması ve yaşanan dikkatsizlik genel restoran deneyimini olumsuz etkiliyor. Qwen bu satırda çıktı üretmemiş, DeepSeek etiketini onaylayabilirsiniz."
+    model_b_triplets: [],
+    model_a_name: "Model A",
+    model_b_name: "Model B",
+    agent_initial_reasoning: "Mekanın kalabalık olması ve yaşanan dikkatsizlik genel restoran deneyimini olumsuz etkiliyor. Model B bu satırda çıktı üretmemiş, Model A etiketini onaylayabilirsiniz."
   },
   {
     id: 3,
     text: "Hamburgeri hoşuma gidiyor ve NY steak de tavsiye edebilirim.",
     review_text: "Hamburgeri hoşuma gidiyor ve NY steak de tavsiye edebilirim.",
     aspect_category_list: ["FOOD#QUALITY", "FOOD#STYLE_OPTIONS", "RESTAURANT#GENERAL"],
-    deepseek_triplets: [
-      { id: 'ds_4', aspect_term: 'NY steak', aspect_category: 'FOOD#QUALITY', sentiment_polarity: 'positive' },
-      { id: 'ds_5', aspect_term: 'Hamburgeri', aspect_category: 'FOOD#QUALITY', sentiment_polarity: 'positive' }
+    model_a_triplets: [
+      { id: 'ma_4', aspect_term: 'NY steak', aspect_category: 'FOOD#QUALITY', sentiment_polarity: 'positive' },
+      { id: 'ma_5', aspect_term: 'Hamburgeri', aspect_category: 'FOOD#QUALITY', sentiment_polarity: 'positive' }
     ],
-    qwen_triplets: [
-      { id: 'qw_2', aspect_term: 'Hamburgeri', aspect_category: 'FOOD#QUALITY', sentiment_polarity: 'positive' },
-      { id: 'qw_3', aspect_term: 'NY steak', aspect_category: 'FOOD#QUALITY', sentiment_polarity: 'positive' }
+    model_b_triplets: [
+      { id: 'mb_2', aspect_term: 'Hamburgeri', aspect_category: 'FOOD#QUALITY', sentiment_polarity: 'positive' },
+      { id: 'mb_3', aspect_term: 'NY steak', aspect_category: 'FOOD#QUALITY', sentiment_polarity: 'positive' }
     ],
+    model_a_name: "Model A",
+    model_b_name: "Model B",
     agent_initial_reasoning: "Her iki yemek için de net olumlu ifadeler mevcut: hamburger beğenilmiş, NY steak tavsiye edilmiş. Her iki modelin ortak çıktılarını seçebilirsiniz."
   }
 ];
@@ -65,16 +73,16 @@ export default function App() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentData, setCurrentData] = useState<ReviewComparisonData>(FALLBACK_DATA[0]);
   const [totalCount, setTotalCount] = useState(FALLBACK_DATA.length);
-  
+
   // Selections
-  const [selectedDeepseekIds, setSelectedDeepseekIds] = useState<Set<string>>(new Set());
-  const [selectedQwenIds, setSelectedQwenIds] = useState<Set<string>>(new Set());
+  const [selectedModelAIds, setSelectedModelAIds] = useState<Set<string>>(new Set());
+  const [selectedModelBIds, setSelectedModelBIds] = useState<Set<string>>(new Set());
   const [manualTriplets, setManualTriplets] = useState<TripletItem[]>([]);
-  
+
   // Chat
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
-  
+
   // Status
   const [saveToast, setSaveToast] = useState<string | null>(null);
 
@@ -95,8 +103,8 @@ export default function App() {
     }
 
     // Reset selections on new review
-    setSelectedDeepseekIds(new Set());
-    setSelectedQwenIds(new Set());
+    setSelectedModelAIds(new Set());
+    setSelectedModelBIds(new Set());
     setManualTriplets([]);
     setChatMessages([]);
   };
@@ -114,41 +122,41 @@ export default function App() {
   }, [currentIndex]);
 
   // Triplet selection handlers
-  const toggleDeepseek = (id: string) => {
-    const next = new Set(selectedDeepseekIds);
+  const toggleModelA = (id: string) => {
+    const next = new Set(selectedModelAIds);
     next.has(id) ? next.delete(id) : next.add(id);
-    setSelectedDeepseekIds(next);
+    setSelectedModelAIds(next);
   };
 
-  const toggleQwen = (id: string) => {
-    const next = new Set(selectedQwenIds);
+  const toggleModelB = (id: string) => {
+    const next = new Set(selectedModelBIds);
     next.has(id) ? next.delete(id) : next.add(id);
-    setSelectedQwenIds(next);
+    setSelectedModelBIds(next);
   };
 
-  const selectAllDeepseek = () => {
-    setSelectedDeepseekIds(new Set(currentData.deepseek_triplets.map(t => t.id)));
+  const selectAllModelA = () => {
+    setSelectedModelAIds(new Set(currentData.model_a_triplets.map(t => t.id)));
   };
 
-  const clearAllDeepseek = () => setSelectedDeepseekIds(new Set());
+  const clearAllModelA = () => setSelectedModelAIds(new Set());
 
-  const selectAllQwen = () => {
-    setSelectedQwenIds(new Set(currentData.qwen_triplets.map(t => t.id)));
+  const selectAllModelB = () => {
+    setSelectedModelBIds(new Set(currentData.model_b_triplets.map(t => t.id)));
   };
 
-  const clearAllQwen = () => setSelectedQwenIds(new Set());
+  const clearAllModelB = () => setSelectedModelBIds(new Set());
 
   // Save & Next Review
   const handleNextReview = async () => {
     // Gather all selected triplets
     const approvedTriplets: any[] = [];
 
-    currentData.deepseek_triplets.forEach(t => {
-      if (selectedDeepseekIds.has(t.id)) approvedTriplets.push(t);
+    currentData.model_a_triplets.forEach(t => {
+      if (selectedModelAIds.has(t.id)) approvedTriplets.push(t);
     });
 
-    currentData.qwen_triplets.forEach(t => {
-      if (selectedQwenIds.has(t.id)) approvedTriplets.push(t);
+    currentData.model_b_triplets.forEach(t => {
+      if (selectedModelBIds.has(t.id)) approvedTriplets.push(t);
     });
 
     manualTriplets.forEach(t => approvedTriplets.push(t));
@@ -182,8 +190,8 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           review_text: currentData.review_text,
-          deepseek_triplets: currentData.deepseek_triplets,
-          qwen_triplets: currentData.qwen_triplets,
+          model_a_triplets: currentData.model_a_triplets,
+          model_b_triplets: currentData.model_b_triplets,
           user_message: text,
           chat_history: nextHistory
         })
@@ -256,21 +264,21 @@ export default function App() {
 
       {/* Main Workspace (Split 65% Top / 35% Bottom) */}
       <main className="flex-1 p-3 md:p-5 flex flex-col gap-4 max-w-[1700px] w-full mx-auto h-[calc(100vh-3.5rem)] overflow-hidden">
-        
+
         {/* 1. TOP SECTION (Three-Column Layout - ~65% height) */}
         <section className="h-[62%] md:h-[65%] grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 overflow-hidden min-h-[360px]">
-          
-          {/* Left Column: Model A (DeepSeek) */}
+
+          {/* Left Column: Model A */}
           <ModelTripletColumn
-            title="Model A - DeepSeek"
-            subtitle="semeval_deepseek_labeled.csv"
-            badgeText="DEEPSEEK V3"
+            title={currentData.model_a_name ? `Model A - ${currentData.model_a_name}` : "Model A"}
+            subtitle=""
+            badgeText={currentData.model_a_name || "MODEL A"}
             badgeColor="bg-purple-500/10 text-purple-300 border-purple-500/30"
-            triplets={currentData.deepseek_triplets}
-            selectedIds={selectedDeepseekIds}
-            onToggleSelect={toggleDeepseek}
-            onSelectAll={selectAllDeepseek}
-            onClearAll={clearAllDeepseek}
+            triplets={currentData.model_a_triplets}
+            selectedIds={selectedModelAIds}
+            onToggleSelect={toggleModelA}
+            onSelectAll={selectAllModelA}
+            onClearAll={clearAllModelA}
           />
 
           {/* Center Column: Review Text & Custom Manual Form */}
@@ -284,17 +292,17 @@ export default function App() {
             onRemoveTriplet={(id) => setManualTriplets(prev => prev.filter(m => m.id !== id))}
           />
 
-          {/* Right Column: Model B (Qwen) */}
+          {/* Right Column: Model B */}
           <ModelTripletColumn
-            title="Model B - Qwen"
-            subtitle="semeval_qwen_labeled.csv"
-            badgeText="QWEN 2.5"
+            title={currentData.model_b_name ? `Model B - ${currentData.model_b_name}` : "Model B"}
+            subtitle=""
+            badgeText={currentData.model_b_name || "MODEL B"}
             badgeColor="bg-cyan-500/10 text-cyan-300 border-cyan-500/30"
-            triplets={currentData.qwen_triplets}
-            selectedIds={selectedQwenIds}
-            onToggleSelect={toggleQwen}
-            onSelectAll={selectAllQwen}
-            onClearAll={clearAllQwen}
+            triplets={currentData.model_b_triplets}
+            selectedIds={selectedModelBIds}
+            onToggleSelect={toggleModelB}
+            onSelectAll={selectAllModelB}
+            onClearAll={clearAllModelB}
           />
 
         </section>
@@ -302,7 +310,7 @@ export default function App() {
 
         {/* 2. BOTTOM SECTION (~35% height) */}
         <section className="flex-1 min-h-[160px] grid grid-cols-1 lg:grid-cols-12 gap-3 md:gap-4 overflow-hidden">
-          
+
           {/* Bottom-Left: Helper Agent Chatbox (Span 8 columns on large screens) */}
           <div className="lg:col-span-8 h-full overflow-hidden">
             <HelperAgentChatbox
@@ -320,7 +328,7 @@ export default function App() {
               className="group relative w-full h-full min-h-[90px] max-h-36 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 active:scale-[0.99] text-white rounded-2xl shadow-2xl transition-all duration-200 p-6 flex flex-col items-center justify-center text-center overflow-hidden border border-white/20 select-none cursor-pointer"
             >
               <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
-              
+
               <span className="text-xs uppercase tracking-widest text-blue-200 font-mono mb-1 flex items-center gap-1.5">
                 <span>SEÇİMLERİ KAYDET & GEÇ</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>

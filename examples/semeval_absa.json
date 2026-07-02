@@ -3,11 +3,11 @@
     "id": 0,
     "review_text": "Manzara şahane ama servis rezalet",
     "translation": "The view is wonderful but the service is terrible",
-    "deepseek_triplets": [
+    "model_a_triplets": [
       {"id": "d0", "aspect_term": "manzara", "aspect_category": "Restaurant#general", "sentiment_polarity": "positive"},
       {"id": "d1", "aspect_term": "servis", "aspect_category": "Service#general", "sentiment_polarity": "negative"}
     ],
-    "qwen_triplets": [
+    "model_b_triplets": [
       {"id": "q0", "aspect_term": "manzara", "aspect_category": "Restaurant#general", "sentiment_polarity": "positive"},
       {"id": "q1", "aspect_term": "servis", "aspect_category": "Service#general", "sentiment_polarity": "neutral"}
     ],
@@ -18,11 +18,11 @@
     "id": 1,
     "review_text": "Yemekler sıcacık ve çok lezzetliydi, fiyatlar da bu kaliteye göre oldukça makul.",
     "translation": "The food was warm and very delicious, prices are quite reasonable for this quality.",
-    "deepseek_triplets": [
+    "model_a_triplets": [
       {"id": "d2", "aspect_term": "Yemekler", "aspect_category": "Food#quality", "sentiment_polarity": "positive"},
       {"id": "d3", "aspect_term": "fiyatlar", "aspect_category": "Food#prices", "sentiment_polarity": "positive"}
     ],
-    "qwen_triplets": [
+    "model_b_triplets": [
       {"id": "q2", "aspect_term": "Yemekler", "aspect_category": "Food#quality", "sentiment_polarity": "positive"},
       {"id": "q3", "aspect_term": "fiyatlar", "aspect_category": "Food#prices", "sentiment_polarity": "neutral"}
     ],
@@ -33,11 +33,11 @@
     "id": 2,
     "review_text": "Garsonlar aşırı ilgisizdi, basit bir bardak su için 20 dakika beklemek zorunda kaldık.",
     "translation": "Waiters were extremely inattentive, we had to wait 20 mins for a simple glass of water.",
-    "deepseek_triplets": [
+    "model_a_triplets": [
       {"id": "d4", "aspect_term": "Garsonlar", "aspect_category": "Service#general", "sentiment_polarity": "negative"},
       {"id": "d5", "aspect_term": "su servisi", "aspect_category": "Service#speed", "sentiment_polarity": "negative"}
     ],
-    "qwen_triplets": [
+    "model_b_triplets": [
       {"id": "q4", "aspect_term": "Garsonlar", "aspect_category": "Service#general", "sentiment_polarity": "negative"}
     ],
     "label": [],
@@ -47,11 +47,11 @@
     "id": 3,
     "review_text": "Ambiyans harika tam bir romantik akşam yemeği mekanı ama ana yemek porsiyonları biraz küçük.",
     "translation": "Great ambience perfect romantic dinner spot but main course portions are a bit small.",
-    "deepseek_triplets": [
+    "model_a_triplets": [
       {"id": "d6", "aspect_term": "Ambiyans", "aspect_category": "Ambience#general", "sentiment_polarity": "positive"},
       {"id": "d7", "aspect_term": "porsiyonlar", "aspect_category": "Food#style_options", "sentiment_polarity": "negative"}
     ],
-    "qwen_triplets": [
+    "model_b_triplets": [
       {"id": "q5", "aspect_term": "Ambiyans", "aspect_category": "Ambience#general", "sentiment_polarity": "positive"},
       {"id": "q6", "aspect_term": "ana yemek", "aspect_category": "Food#quality", "sentiment_polarity": "neutral"}
     ],
@@ -62,11 +62,11 @@
     "id": 4,
     "review_text": "Künefe çıtır çıtır ve şerbeti tam kıvamındaydı, çay servisi de ikramdı kesinlikle tavsiye ederim.",
     "translation": "Kunefe was crispy and syrup was just right, tea service was complimentary definitely recommend.",
-    "deepseek_triplets": [
+    "model_a_triplets": [
       {"id": "d8", "aspect_term": "Künefe", "aspect_category": "Food#quality", "sentiment_polarity": "positive"},
       {"id": "d9", "aspect_term": "çay servisi", "aspect_category": "Service#general", "sentiment_polarity": "positive"}
     ],
-    "qwen_triplets": [
+    "model_b_triplets": [
       {"id": "q7", "aspect_term": "Künefe", "aspect_category": "Food#quality", "sentiment_polarity": "positive"},
       {"id": "q8", "aspect_term": "şerbet", "aspect_category": "Food#quality", "sentiment_polarity": "positive"}
     ],

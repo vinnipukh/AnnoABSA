@@ -77,7 +77,11 @@ class ABSAAnnotatorConfig:
             "disable_ai_automatic_prediction": False,
             "annotation_guideline": None,
             "n_few_shot": 10,
-            "openai_key": None
+            "openai_key": None,
+            "compare_model_a_csv": None,
+            "compare_model_a_name": None,
+            "compare_model_b_csv": None,
+            "compare_model_b_name": None
         }
 
     def set_sentiment_elements(self, elements: List[str]) -> None:
@@ -163,6 +167,22 @@ class ABSAAnnotatorConfig:
         if n_few_shot < 0:
             raise ValueError("Number of few-shot examples must be non-negative")
         self.config["n_few_shot"] = n_few_shot
+
+    def set_compare_model_a_csv(self, csv_path: str) -> None:
+        """Set the CSV path for comparison Model A."""
+        self.config["compare_model_a_csv"] = csv_path
+
+    def set_compare_model_a_name(self, name: str) -> None:
+        """Set the display name for comparison Model A."""
+        self.config["compare_model_a_name"] = name
+
+    def set_compare_model_b_csv(self, csv_path: str) -> None:
+        """Set the CSV path for comparison Model B."""
+        self.config["compare_model_b_csv"] = csv_path
+
+    def set_compare_model_b_name(self, name: str) -> None:
+        """Set the display name for comparison Model B."""
+        self.config["compare_model_b_name"] = name
 
     def set_session_id(self, session_id: str) -> None:
         """Set the session ID for this annotation session."""
@@ -568,6 +588,32 @@ Examples:
     )
 
     parser.add_argument(
+        "--compare-model-a-csv",
+        metavar="PATH",
+        help="CSV file for comparison Model A (per-row or STD format)"
+    )
+
+    parser.add_argument(
+        "--compare-model-a-name",
+        metavar="NAME",
+        default="Model A",
+        help="Display name for comparison Model A (default: Model A)"
+    )
+
+    parser.add_argument(
+        "--compare-model-b-csv",
+        metavar="PATH",
+        help="CSV file for comparison Model B (per-row or STD format)"
+    )
+
+    parser.add_argument(
+        "--compare-model-b-name",
+        metavar="NAME",
+        default="Model B",
+        help="Display name for comparison Model B (default: Model B)"
+    )
+
+    parser.add_argument(
         "--n-few-shot",
         type=int,
         default=10,
@@ -764,6 +810,15 @@ Examples:
 
     if args.n_few_shot:
         config.set_n_few_shot(args.n_few_shot)
+
+    if args.compare_model_a_csv:
+        config.set_compare_model_a_csv(args.compare_model_a_csv)
+    if args.compare_model_a_name:
+        config.set_compare_model_a_name(args.compare_model_a_name)
+    if args.compare_model_b_csv:
+        config.set_compare_model_b_csv(args.compare_model_b_csv)
+    if args.compare_model_b_name:
+        config.set_compare_model_b_name(args.compare_model_b_name)
 
     # Show configuration if requested
     if args.show_config:

@@ -69,7 +69,11 @@ def load_config():
         "click_on_token": True,
         "store_time": False,
         "display_avg_annotation_time": False,
-        "enable_pre_prediction": False
+        "enable_pre_prediction": False,
+        "compare_model_a_csv": None,
+        "compare_model_a_name": None,
+        "compare_model_b_csv": None,
+        "compare_model_b_name": None
     }
 
 
@@ -129,8 +133,8 @@ class SaveTripletsRequest(BaseModel):
 
 class AgentChatRequest(BaseModel):
     review_text: str
-    deepseek_triplets: list = []
-    qwen_triplets: list = []
+    model_a_triplets: list = []
+    model_b_triplets: list = []
     user_message: str
     chat_history: list = []
 
@@ -206,37 +210,78 @@ def parse_triplet_column(raw_val, prefix="t"):
         print("Parse error:", e)
         return []
 
-def generate_mock_reasoning(text: str, ds_list: list, qw_list: list) -> str:
+def generate_mock_reasoning(text: str, model_a_name: str, model_b_name: str, model_a_list: list, model_b_list: list) -> str:
     if not text:
         return "Helper agent: İnceleme seçilmedi."
-    ds_aspects = [t.get("aspect_term", "") for t in ds_list if t.get("aspect_term")]
-    qw_aspects = [t.get("aspect_term", "") for t in qw_list if t.get("aspect_term")]
-    
-    common = set(ds_aspects).intersection(set(qw_aspects))
-    only_ds = set(ds_aspects) - set(qw_aspects)
-    only_qw = set(qw_aspects) - set(ds_aspects)
-    
+    model_a_aspects = [t.get("aspect_term", "") for t in model_a_list if t.get("aspect_term")]
+    model_b_aspects = [t.get("aspect_term", "") for t in model_b_list if t.get("aspect_term")]
+
+    common = set(model_a_aspects).intersection(set(model_b_aspects))
+    only_a = set(model_a_aspects) - set(model_b_aspects)
+    only_b = set(model_b_aspects) - set(model_a_aspects)
+
     reasoning = f"Helper agent: Merhaba! İncelemeyi analiz ettim: **\"{text}\"**.\n\n"
     if common:
         reasoning += f"• **Ortak Tespitler:** Her iki model de `{', '.join(common)}` ögelerini doğru yakalamış.\n"
-    if only_ds:
-        reasoning += f"• **DeepSeek Farkı:** DeepSeek ek olarak `{', '.join(only_ds)}` ögesini tespit etmiş. Bağlama göre bu mantıklı.\n"
-    if only_qw:
-        reasoning += f"• **Qwen Farkı:** Qwen ise `{', '.join(only_qw)}` ögesini öne çıkarmış.\n"
-    
-    if ds_list and qw_list:
-        if len(ds_list) >= len(qw_list):
-            reasoning += "\n💡 **Önerim:** DeepSeek duygu polaritelerini daha detaylı ayrıştırmış görünüyor. DeepSeek çıktısını temel alıp eksikleri manuel tamamlayabilirsin."
+    if only_a:
+        reasoning += f"• **{model_a_name} Farkı:** {model_a_name} ek olarak `{', '.join(only_a)}` ögesini tespit etmiş. Bağlama göre bu mantıklı.\n"
+    if only_b:
+        reasoning += f"• **{model_b_name} Farkı:** {model_b_name} ise `{', '.join(only_b)}` ögesini öne çıkarmış.\n"
+
+    if model_a_list and model_b_list:
+        if len(model_a_list) >= len(model_b_list):
+            reasoning += f"\n💡 **Önerim:** {model_a_name} duygu polaritelerini daha detaylı ayrıştırmış görünüyor. {model_a_name} çıktısını temel alıp eksikleri manuel tamamlayabilirsin."
         else:
-            reasoning += "\n💡 **Önerim:** Qwen özetlemeyi daha net yapmış. Qwen tripletlerini onaylamanı tavsiye ederim."
-    elif ds_list:
-        reasoning += "\n💡 **Önerim:** Qwen bu satırda çıktı üretmemiş. DeepSeek tripletlerini kontrol edip onaylayabilirsin."
-    elif qw_list:
-        reasoning += "\n💡 **Önerim:** DeepSeek bu satırda çıktı üretmemiş. Qwen tripletlerini seçebilirsin."
+            reasoning += f"\n💡 **Önerim:** {model_b_name} özetlemeyi daha net yapmış. {model_b_name} tripletlerini onaylamanı tavsiye ederim."
+    elif model_a_list:
+        reasoning += f"\n💡 **Önerim:** {model_b_name} bu satırda çıktı üretmemiş. {model_a_name} tripletlerini kontrol edip onaylayabilirsin."
+    elif model_b_list:
+        reasoning += f"\n💡 **Önerim:** {model_a_name} bu satırda çıktı üretmemiş. {model_b_name} tripletlerini seçebilirsin."
     else:
         reasoning += "\n💡 **Önerim:** Modeller bu incelemede herhangi bir triplet çıkaramamış. Orta kolondaki formdan manuel giriş yapmalısın."
-        
+
     return reasoning
+def _load_comparison_csv(csv_path: str, data_idx: int, review_text: str, prefix: str) -> list:
+    """Load triplets from a comparison CSV, auto-detecting format.
+
+    Supports:
+    - STD format (columns: review, triplet) — matched by review text
+    - Per-row format (columns: review_id, aspect_term, aspect_category, sentiment_polarity) — matched by index
+    """
+    if not csv_path or not os.path.exists(csv_path):
+        return []
+    try:
+        df = pd.read_csv(csv_path, encoding='utf-8')
+    except Exception as e:
+        print(f"Warning: Could not read comparison CSV '{csv_path}': {e}")
+        return []
+
+    # Auto-detect: STD format has 'review' and 'triplet' columns
+    if 'review' in df.columns and 'triplet' in df.columns:
+        # STD format — match by review text
+        match = df[df['review'] == review_text]
+        results = []
+        for i, (_, r) in enumerate(match.iterrows()):
+            triplets = parse_triplet_column(r.get('triplet'), prefix=f"{prefix}_{i}")
+            results.extend(triplets)
+        return results
+    else:
+        # Per-row format — match by review_id index
+        if 'review_id' in df.columns:
+            match = df[df['review_id'] == data_idx]
+        else:
+            return []
+        results = []
+        for i, (_, r) in enumerate(match.iterrows()):
+            results.append({
+                "id": f"{prefix}_{i}",
+                "aspect_term": str(r.get("aspect_term", "")),
+                "aspect_category": str(r.get("aspect_category", "")),
+                "sentiment_polarity": str(r.get("sentiment_polarity", ""))
+            })
+        return results
+
+
 @app.get("/data/{data_idx}")
 def get_data(data_idx: int):
     try:
@@ -246,8 +291,10 @@ def get_data(data_idx: int):
 
         default_aspects = CONFIG_DATA.get("aspect_categories", ['Restaurant#general', 'Service#general', 'Service#speed', 'Food#quality', 'Food#prices', 'Food#style_options', 'Ambience#general', 'Location#general', 'Drinks#quality', 'Drinks#prices'])
 
-        deepseek_triplets = []
-        qwen_triplets = []
+        model_a_triplets = []
+        model_b_triplets = []
+        model_a_name = CONFIG_DATA.get("compare_model_a_name", "Model A")
+        model_b_name = CONFIG_DATA.get("compare_model_b_name", "Model B")
         text_val = ""
         translation_val = ""
         label_val = ""
@@ -260,8 +307,8 @@ def get_data(data_idx: int):
             lbl = item.get("label", [])
             label_val = json.dumps(lbl, ensure_ascii=False) if isinstance(lbl, list) else str(lbl if lbl is not None else "")
             aspects_val = item.get("aspect_category_list", default_aspects)
-            deepseek_triplets = item.get("deepseek_triplets", [])
-            qwen_triplets = item.get("qwen_triplets", [])
+            model_a_triplets = item.get("model_a_triplets", [])
+            model_b_triplets = item.get("model_b_triplets", [])
         else:
             df = data
             row = df.iloc[data_idx]
@@ -275,42 +322,24 @@ def get_data(data_idx: int):
             raw_asp = row_dict.get("aspect_category_list", None)
             aspects_val = raw_asp if raw_asp else default_aspects
 
-            # Support user custom format: review_text, aspect_triplets, new_triplets, reasoning
+            # Support inline columns: aspect_triplets / new_triplets (backward compat)
             if "aspect_triplets" in row_dict:
-                deepseek_triplets = parse_triplet_column(row_dict.get("aspect_triplets"), prefix="ds")
+                model_a_triplets = parse_triplet_column(row_dict.get("aspect_triplets"), prefix="ma")
             if "new_triplets" in row_dict:
-                qwen_triplets = parse_triplet_column(row_dict.get("new_triplets"), prefix="qw")
-            
-            # If sibling CSVs exist and columns were not in row
-            if not deepseek_triplets and not qwen_triplets:
-                base_dir = os.path.dirname(DATA_FILE_PATH)
-                ds_path = os.path.join(base_dir, "semeval_deepseek_labeled.csv") if base_dir else "semeval_deepseek_labeled.csv"
-                qw_path = os.path.join(base_dir, "semeval_qwen_labeled.csv") if base_dir else "semeval_qwen_labeled.csv"
-                
-                if os.path.exists(ds_path):
-                    ds_df = pd.read_csv(ds_path)
-                    match_ds = ds_df[ds_df["review_id"] == data_idx]
-                    for idx_ds, r in match_ds.iterrows():
-                        deepseek_triplets.append({
-                            "id": f"ds_{idx_ds}",
-                            "aspect_term": str(r.get("aspect_term", "")),
-                            "aspect_category": str(r.get("aspect_category", "")),
-                            "sentiment_polarity": str(r.get("sentiment_polarity", ""))
-                        })
-                if os.path.exists(qw_path):
-                    qw_df = pd.read_csv(qw_path)
-                    match_qw = qw_df[qw_df["review_id"] == data_idx]
-                    for idx_qw, r in match_qw.iterrows():
-                        qwen_triplets.append({
-                            "id": f"qw_{idx_qw}",
-                            "aspect_term": str(r.get("aspect_term", "")),
-                            "aspect_category": str(r.get("aspect_category", "")),
-                            "sentiment_polarity": str(r.get("sentiment_polarity", ""))
-                        })
+                model_b_triplets = parse_triplet_column(row_dict.get("new_triplets"), prefix="mb")
+
+            # Load comparison CSVs from config (overrides inline columns if both exist)
+            comp_a_path = CONFIG_DATA.get("compare_model_a_csv")
+            comp_b_path = CONFIG_DATA.get("compare_model_b_csv")
+            if comp_a_path or comp_b_path:
+                if comp_a_path:
+                    model_a_triplets = _load_comparison_csv(comp_a_path, data_idx, text_val, "ma")
+                if comp_b_path:
+                    model_b_triplets = _load_comparison_csv(comp_b_path, data_idx, text_val, "mb")
 
         agent_initial_reasoning = str(row_dict.get("reasoning", "")) if DATA_FILE_TYPE != "json" and "reasoning" in row_dict else ""
         if not agent_initial_reasoning or agent_initial_reasoning in ["nan", "None", ""]:
-            agent_initial_reasoning = generate_mock_reasoning(text_val, deepseek_triplets, qwen_triplets)
+            agent_initial_reasoning = generate_mock_reasoning(text_val, model_a_name, model_b_name, model_a_triplets, model_b_triplets)
 
         return {
             "id": data_idx,
@@ -319,8 +348,10 @@ def get_data(data_idx: int):
             "label": label_val,
             "translation": translation_val,
             "aspect_category_list": aspects_val,
-            "deepseek_triplets": deepseek_triplets,
-            "qwen_triplets": qwen_triplets,
+            "model_a_triplets": model_a_triplets,
+            "model_b_triplets": model_b_triplets,
+            "model_a_name": model_a_name,
+            "model_b_name": model_b_name,
             "agent_initial_reasoning": agent_initial_reasoning
         }
 
@@ -1141,19 +1172,21 @@ def save_review_triplets(data_idx: int, req: SaveTripletsRequest):
 def agent_chat(req: AgentChatRequest):
     config = load_config()
     openai_key = config.get("openai_key")
-    
+    model_a_name = config.get("compare_model_a_name", "Model A")
+    model_b_name = config.get("compare_model_b_name", "Model B")
+
     if openai_key:
         try:
             from openai import OpenAI
             client = OpenAI(api_key=openai_key)
             messages = [
-                {"role": "system", "content": f"Sen ABSA (Aspect-Based Sentiment Analysis) veri etiketleme asistanısın. Şu incelemeyi tartışıyorsunuz: \"{req.review_text}\". DeepSeek tripletleri: {req.deepseek_triplets}, Qwen tripletleri: {req.qwen_triplets}. Kullanıcıya mantıklı, akıl yürüterek açıklama yap."}
+                {"role": "system", "content": f"Sen ABSA (Aspect-Based Sentiment Analysis) veri etiketleme asistanısın. Şu incelemeyi tartışıyorsunuz: \"{req.review_text}\". {model_a_name} tripletleri: {req.model_a_triplets}, {model_b_name} tripletleri: {req.model_b_triplets}. Kullanıcıya mantıklı, akıl yürüterek açıklama yap."}
             ]
             for h in req.chat_history[-4:]:
                 role = "assistant" if h.get("sender") == "agent" else "user"
                 messages.append({"role": role, "content": h.get("text", "")})
             messages.append({"role": "user", "content": req.user_message})
-            
+
             comp = client.chat.completions.create(
                 model=config.get("llm_model", "gpt-4o"),
                 messages=messages,
@@ -1166,13 +1199,13 @@ def agent_chat(req: AgentChatRequest):
 
     msg = req.user_message.lower()
     reply = "Helper agent: "
-    if "deepseek" in msg or "model a" in msg:
-        reply += "DeepSeek modeli cümlenin yan cümleciklerini ('manzara şahane' ve 'servis rezalet') ayrı ayrı değerlendirmiş. Zıtlık bağlaçlarını iyi çözdüğü için DeepSeek tripletleri daha tutarlı."
-    elif "qwen" in msg or "model b" in msg:
-        reply += "Qwen modeli ana duyguya odaklandığı için bazen olumsuz yan etiketleri kaçırabiliyor. Qwen çıktısında doğru olanları seçip eksikleri orta formdan ekleyebilirsin."
+    if "model a" in msg or model_a_name.lower() in msg:
+        reply += f"{model_a_name} modeli cümlenin yan cümleciklerini ('manzara şahane' ve 'servis rezalet') ayrı ayrı değerlendirmiş. Zıtlık bağlaçlarını iyi çözdüğü için {model_a_name} tripletleri daha tutarlı."
+    elif "model b" in msg or model_b_name.lower() in msg:
+        reply += f"{model_b_name} modeli ana duyguya odaklandığı için bazen olumsuz yan etiketleri kaçırabiliyor. {model_b_name} çıktısında doğru olanları seçip eksikleri orta formdan ekleyebilirsin."
     elif "neden" in msg or "niye" in msg or "hangisi" in msg:
         reply += "Metinde zıtlık bağlacı olduğu için iki model farklı sonuç üretmiş. Benim önerim hem yeşil (positive) hem kırmızı (negative) etiketleri seçerek tam kapsamlı etiketleme yapman."
     else:
-        reply += f"\"{req.user_message}\" mesajını aldım. Hem DeepSeek hem Qwen çıktısındaki doğru tripletleri işaretleyip sağ alttaki \"press for next review\" butonuna basarak kaydedebilirsin."
-        
+        reply += f"\"{req.user_message}\" mesajını aldım. Hem {model_a_name} hem {model_b_name} çıktısındaki doğru tripletleri işaretleyip sağ alttaki \"press for next review\" butonuna basarak kaydedebilirsin."
+
     return {"reply": reply}
