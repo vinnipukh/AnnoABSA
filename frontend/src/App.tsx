@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { TripletItem, ReviewComparisonData, ChatMessage } from './types';
+import { TripletItem, ReviewComparisonData, ChatMessage, Settings } from './types';
 import { ModelTripletColumn } from './components/ModelTripletColumn';
 import { ManualInputForm } from './components/ManualInputForm';
 import { HelperAgentChatbox } from './components/HelperAgentChatbox';
+import { PhraseAnnotator } from './components/PhraseAnnotator';
 
-// Fallback local dataset matching user's exact CSV format
 const FALLBACK_DATA: ReviewComparisonData[] = [
   {
     id: 0,
@@ -69,40 +69,41 @@ const FALLBACK_DATA: ReviewComparisonData[] = [
   }
 ];
 
+const DEFAULT_SETTINGS: Settings = {
+  current_index: 0, max_number_of_idxs: 0, total_count: FALLBACK_DATA.length,
+  session_id: null, sentiment_elements: ['aspect_term','aspect_category','sentiment_polarity','opinion_term'],
+  sentiment_polarity_options: ['positive','negative','neutral'],
+  aspect_categories: ['RESTAURANT#GENERAL','FOOD#QUALITY','SERVICE#GENERAL','AMBIENCE#GENERAL','FOOD#PRICES','FOOD#STYLE_OPTIONS'],
+  implicit_aspect_term_allowed: true, implicit_opinion_term_allowed: false,
+  auto_clean_phrases: true, save_phrase_positions: true, click_on_token: true,
+};
+
 export default function App() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentData, setCurrentData] = useState<ReviewComparisonData>(FALLBACK_DATA[0]);
   const [totalCount, setTotalCount] = useState(FALLBACK_DATA.length);
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
 
-  // Selections
   const [selectedModelAIds, setSelectedModelAIds] = useState<Set<string>>(new Set());
   const [selectedModelBIds, setSelectedModelBIds] = useState<Set<string>>(new Set());
   const [manualTriplets, setManualTriplets] = useState<TripletItem[]>([]);
 
-  // Chat
+  const [mode, setMode] = useState<'compare' | 'manual'>('compare');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
-
-  // Status
+  const [showChat, setShowChat] = useState(true);
   const [saveToast, setSaveToast] = useState<string | null>(null);
 
-  // Backend URL from env or local default
   const backendUrl = import.meta.env?.VITE_BACKEND_URL || 'http://localhost:8000';
 
-  // Load Data Row
   const loadReviewRow = async (index: number) => {
     try {
       const res = await fetch(`${backendUrl}/data/${index}`);
       if (!res.ok) throw new Error("API Offline");
-      const data: ReviewComparisonData = await res.json();
-      setCurrentData(data);
+      setCurrentData(await res.json());
     } catch (e) {
-      // Graceful fallback to static data
-      const safeIndex = index % FALLBACK_DATA.length;
-      setCurrentData(FALLBACK_DATA[safeIndex]);
+      setCurrentData(FALLBACK_DATA[index % FALLBACK_DATA.length]);
     }
-
-    // Reset selections on new review
     setSelectedModelAIds(new Set());
     setSelectedModelBIds(new Set());
     setManualTriplets([]);
@@ -110,209 +111,173 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Initial fetch
     fetch(`${backendUrl}/settings`)
       .then(r => r.json())
-      .then(s => {
+      .then((s: any) => {
+        setSettings({
+          current_index: s.current_index ?? 0,
+          max_number_of_idxs: s.max_number_of_idxs ?? 0,
+          total_count: s.total_count ?? FALLBACK_DATA.length,
+          session_id: s.session_id ?? null,
+          sentiment_elements: s['sentiment elements'] ?? DEFAULT_SETTINGS.sentiment_elements,
+          sentiment_polarity_options: s['sentiment_polarity options'] ?? DEFAULT_SETTINGS.sentiment_polarity_options,
+          aspect_categories: s.aspect_categories ?? DEFAULT_SETTINGS.aspect_categories,
+          implicit_aspect_term_allowed: s.implicit_aspect_term_allowed ?? true,
+          implicit_opinion_term_allowed: s.implicit_opinion_term_allowed ?? false,
+          auto_clean_phrases: s.auto_clean_phrases ?? true,
+          save_phrase_positions: s.save_phrase_positions ?? true,
+          click_on_token: s.click_on_token ?? true,
+        });
         if (s.total_count) setTotalCount(s.total_count);
       })
       .catch(() => {});
+  }, []);
 
-    loadReviewRow(currentIndex);
-  }, [currentIndex]);
+  useEffect(() => { loadReviewRow(currentIndex); }, [currentIndex]);
 
-  // Triplet selection handlers
   const toggleModelA = (id: string) => {
-    const next = new Set(selectedModelAIds);
-    next.has(id) ? next.delete(id) : next.add(id);
-    setSelectedModelAIds(next);
+    const n = new Set(selectedModelAIds);
+    n.has(id) ? n.delete(id) : n.add(id);
+    setSelectedModelAIds(n);
   };
-
   const toggleModelB = (id: string) => {
-    const next = new Set(selectedModelBIds);
-    next.has(id) ? next.delete(id) : next.add(id);
-    setSelectedModelBIds(next);
+    const n = new Set(selectedModelBIds);
+    n.has(id) ? n.delete(id) : n.add(id);
+    setSelectedModelBIds(n);
   };
-
-  const selectAllModelA = () => {
-    setSelectedModelAIds(new Set(currentData.model_a_triplets.map(t => t.id)));
-  };
-
+  const selectAllModelA = () => setSelectedModelAIds(new Set(currentData.model_a_triplets.map(t => t.id)));
   const clearAllModelA = () => setSelectedModelAIds(new Set());
-
-  const selectAllModelB = () => {
-    setSelectedModelBIds(new Set(currentData.model_b_triplets.map(t => t.id)));
-  };
-
+  const selectAllModelB = () => setSelectedModelBIds(new Set(currentData.model_b_triplets.map(t => t.id)));
   const clearAllModelB = () => setSelectedModelBIds(new Set());
 
-  // Save & Next Review
   const handleNextReview = async () => {
-    // Gather all selected triplets
-    const approvedTriplets: any[] = [];
-
-    currentData.model_a_triplets.forEach(t => {
-      if (selectedModelAIds.has(t.id)) approvedTriplets.push(t);
-    });
-
-    currentData.model_b_triplets.forEach(t => {
-      if (selectedModelBIds.has(t.id)) approvedTriplets.push(t);
-    });
-
-    manualTriplets.forEach(t => approvedTriplets.push(t));
-
+    const approved: any[] = [];
+    currentData.model_a_triplets.forEach(t => { if (selectedModelAIds.has(t.id)) approved.push(t); });
+    currentData.model_b_triplets.forEach(t => { if (selectedModelBIds.has(t.id)) approved.push(t); });
+    manualTriplets.forEach(t => approved.push(t));
     try {
       await fetch(`${backendUrl}/review/${currentIndex}/save`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ triplets: approvedTriplets })
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ triplets: approved }),
       });
-    } catch (e) {
-      // offline save simulation
-    }
-
-    setSaveToast(`✅ İnceleme #${currentIndex + 1} kaydedildi (${approvedTriplets.length} triplet).`);
+    } catch (_) {}
+    setSaveToast(`✅ İnceleme #${currentIndex + 1} kaydedildi (${approved.length} etiket).`);
     setTimeout(() => setSaveToast(null), 2500);
-
-    setCurrentIndex(prev => (prev + 1) % totalCount);
+    setCurrentIndex(p => (p + 1) % totalCount);
   };
 
-  // Chat send handler
   const handleSendMessage = async (text: string) => {
     const userMsg: ChatMessage = { id: `u_${Date.now()}`, sender: 'user', text };
     const nextHistory = [...chatMessages, userMsg];
     setChatMessages(nextHistory);
     setIsChatLoading(true);
-
     try {
       const res = await fetch(`${backendUrl}/agent/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          review_text: currentData.review_text,
-          model_a_triplets: currentData.model_a_triplets,
-          model_b_triplets: currentData.model_b_triplets,
-          user_message: text,
-          chat_history: nextHistory
-        })
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ review_text: currentData.review_text, model_a_triplets: currentData.model_a_triplets, model_b_triplets: currentData.model_b_triplets, user_message: text, chat_history: nextHistory }),
       });
       if (!res.ok) throw new Error("offline");
-      const replyData = await res.json();
-      setChatMessages(prev => [...prev, { id: `a_${Date.now()}`, sender: 'agent', text: replyData.reply }]);
-    } catch (e) {
-      // Mock conversational response fallback
+      const d = await res.json();
+      setChatMessages(p => [...p, { id: `a_${Date.now()}`, sender: 'agent', text: d.reply }]);
+    } catch (_) {
       setTimeout(() => {
-        let reply = "Helper agent: ";
         const q = text.toLowerCase();
-          if (q.includes("neden") || q.includes("niye") || q.includes("hangisi")) {
-            reply += `'${currentData.review_text}' cümlesinde bağlam çok önemli. Benim önerim sol kolondaki tutarlı etiketleri seçip eksikleri orta formdan eklemeniz.`;
-          } else {
-            reply += `Sorunuzu anladım. Bu incelemede hem Model A hem Model B çıktısını karşılaştırıp onayladıklarınızı sağ alttaki 'press for next review' butonuyla kaydedebilirsiniz.`;
-          }
-        setChatMessages(prev => [...prev, { id: `a_${Date.now()}`, sender: 'agent', text: reply }]);
+        let reply = "Helper agent: ";
+        if (q.includes("neden") || q.includes("niye") || q.includes("hangisi"))
+          reply += `'${currentData.review_text}' cümlesinde bağlam çok önemli. Benim önerim sol kolondaki tutarlı etiketleri seçip eksikleri orta formdan eklemeniz.`;
+        else
+          reply += `Sorunuzu anladım. Bu incelemede hem Model A hem Model B çıktısını karşılaştırıp onayladıklarınızı sağ alttaki butonla kaydedebilirsiniz.`;
+        setChatMessages(p => [...p, { id: `a_${Date.now()}`, sender: 'agent', text: reply }]);
       }, 600);
-    } finally {
-      setIsChatLoading(false);
-    }
+    } finally { setIsChatLoading(false); }
   };
+
+  const tripletCount = mode === 'compare'
+    ? selectedModelAIds.size + selectedModelBIds.size + manualTriplets.length
+    : manualTriplets.length;
 
   return (
     <div className="dark bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-blue-500 selection:text-white">
-      {/* Top Navigation Bar */}
-      <header className="h-14 bg-slate-900/90 border-b border-slate-800 px-4 md:px-6 flex items-center justify-between flex-shrink-0 z-20 shadow-md">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-black text-white shadow">
-            A
-          </div>
-          <div>
-            <h1 className="text-base font-bold tracking-tight text-white flex items-center gap-2">
-              <span>AnnoABSA</span>
-              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                LREC 2026 EDITION
-              </span>
-            </h1>
-          </div>
+      {/* Header */}
+      <header className="h-12 bg-slate-900/90 border-b border-slate-800 px-4 flex items-center justify-between flex-shrink-0 z-20 shadow-sm">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-black text-white shadow text-sm">A</div>
+          <h1 className="text-sm font-bold text-white">AnnoABSA</h1>
         </div>
-
-        {/* Progress Tracker */}
-        <div className="flex items-center space-x-4">
-          <div className="hidden sm:flex items-center space-x-2 text-xs font-mono">
-            <span className="text-slate-400">SATIR:</span>
-            <span className="bg-slate-800 px-2.5 py-1 rounded-md text-blue-400 font-bold border border-slate-700">
-              #{currentIndex + 1} / {totalCount}
-            </span>
+        <div className="flex items-center gap-2">
+          {/* Mode toggle */}
+          <div className="flex bg-slate-800/80 border border-slate-700 rounded-lg p-0.5">
+            <button onClick={() => setMode('compare')}
+              className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all select-none ${
+                mode === 'compare' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}>Karşılaştır</button>
+            <button onClick={() => setMode('manual')}
+              className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all select-none ${
+                mode === 'manual' ? 'bg-amber-500 text-black shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}>Manuel</button>
           </div>
-
-          <div className="flex items-center space-x-1 bg-slate-900 border border-slate-800 rounded-lg p-1">
-            <button
-              onClick={() => setCurrentIndex(prev => (prev - 1 + totalCount) % totalCount)}
-              className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-colors"
-              title="Önceki İnceleme"
-            >
-              ◀
-            </button>
-            <button
-              onClick={() => setCurrentIndex(prev => (prev + 1) % totalCount)}
-              className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-colors"
-              title="Sonraki İnceleme"
-            >
-              ▶
-            </button>
+          {/* Chat toggle */}
+          <button onClick={() => setShowChat(p => !p)}
+            className={`p-1.5 rounded-lg transition-all border ${
+              showChat ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' : 'bg-slate-800 text-slate-500 border-slate-700 hover:text-slate-300'
+            }`} title={showChat ? 'Sohbeti Gizle' : 'Sohbeti Göster'}>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+          </button>
+          {/* Nav */}
+          <div className="flex items-center gap-1.5 text-[11px] font-mono">
+            <span className="text-slate-500">Satır:</span>
+            <span className="bg-slate-800 px-2 py-0.5 rounded text-blue-400 font-bold border border-slate-700">#{currentIndex + 1}/{totalCount}</span>
+            <button onClick={() => setCurrentIndex(p => (p - 1 + totalCount) % totalCount)}
+              className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-colors text-xs" title="Önceki">◀</button>
+            <button onClick={() => setCurrentIndex(p => (p + 1) % totalCount)}
+              className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-colors text-xs" title="Sonraki">▶</button>
           </div>
         </div>
       </header>
 
-      {/* Main Workspace (Split 65% Top / 35% Bottom) */}
-      <main className="flex-1 p-3 md:p-5 flex flex-col gap-4 max-w-[1700px] w-full mx-auto h-[calc(100vh-3.5rem)] overflow-hidden">
-
-        {/* 1. TOP SECTION (Three-Column Layout - ~65% height) */}
-        <section className="h-[62%] md:h-[65%] grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 overflow-hidden min-h-[360px]">
-
-          {/* Left Column: Model A */}
-          <ModelTripletColumn
-            title={currentData.model_a_name ? `Model A - ${currentData.model_a_name}` : "Model A"}
-            subtitle=""
-            badgeText={currentData.model_a_name || "MODEL A"}
-            badgeColor="bg-purple-500/10 text-purple-300 border-purple-500/30"
-            triplets={currentData.model_a_triplets}
-            selectedIds={selectedModelAIds}
-            onToggleSelect={toggleModelA}
-            onSelectAll={selectAllModelA}
-            onClearAll={clearAllModelA}
-          />
-
-          {/* Center Column: Review Text & Custom Manual Form */}
-          <ManualInputForm
-            reviewText={currentData.review_text}
-            translation={currentData.translation}
-            categories={currentData.aspect_category_list}
-            polarities={['positive', 'negative', 'neutral']}
-            manualTriplets={manualTriplets}
-            onAddTriplet={(t) => setManualTriplets(prev => [...prev, t])}
-            onRemoveTriplet={(id) => setManualTriplets(prev => prev.filter(m => m.id !== id))}
-          />
-
-          {/* Right Column: Model B */}
-          <ModelTripletColumn
-            title={currentData.model_b_name ? `Model B - ${currentData.model_b_name}` : "Model B"}
-            subtitle=""
-            badgeText={currentData.model_b_name || "MODEL B"}
-            badgeColor="bg-cyan-500/10 text-cyan-300 border-cyan-500/30"
-            triplets={currentData.model_b_triplets}
-            selectedIds={selectedModelBIds}
-            onToggleSelect={toggleModelB}
-            onSelectAll={selectAllModelB}
-            onClearAll={clearAllModelB}
-          />
-
+      {/* Main workspace: natural flex, no fixed percentage splits */}
+      <main className="flex-1 p-3 flex flex-col gap-2 max-w-[1700px] w-full mx-auto h-[calc(100vh-3rem)] overflow-hidden">
+        {/* Top: annotation workspace */}
+        <section className="flex-1 min-h-0">
+          {mode === 'compare' ? (
+            <div className="h-full grid grid-cols-1 md:grid-cols-3 gap-3">
+              <ModelTripletColumn title={currentData.model_a_name ? `Model A - ${currentData.model_a_name}` : "Model A"}
+                subtitle="" badgeText={currentData.model_a_name || "MODEL A"}
+                badgeColor="bg-purple-500/10 text-purple-300 border-purple-500/30"
+                triplets={currentData.model_a_triplets} selectedIds={selectedModelAIds}
+                onToggleSelect={toggleModelA} onSelectAll={selectAllModelA} onClearAll={clearAllModelA} />
+              <ManualInputForm reviewText={currentData.review_text} translation={currentData.translation}
+                categories={currentData.aspect_category_list} polarities={['positive','negative','neutral']}
+                manualTriplets={manualTriplets}
+                onAddTriplet={t => setManualTriplets(p => [...p, t])}
+                onRemoveTriplet={id => setManualTriplets(p => p.filter(m => m.id !== id))} />
+              <ModelTripletColumn title={currentData.model_b_name ? `Model B - ${currentData.model_b_name}` : "Model B"}
+                subtitle="" badgeText={currentData.model_b_name || "MODEL B"}
+                badgeColor="bg-cyan-500/10 text-cyan-300 border-cyan-500/30"
+                triplets={currentData.model_b_triplets} selectedIds={selectedModelBIds}
+                onToggleSelect={toggleModelB} onSelectAll={selectAllModelB} onClearAll={clearAllModelB} />
+            </div>
+          ) : (
+            <div className="h-full">
+              <PhraseAnnotator reviewText={currentData.review_text}
+                categories={currentData.aspect_category_list}
+                polarities={settings.sentiment_polarity_options}
+                clickOnToken={settings.click_on_token}
+                implicitAspectAllowed={settings.implicit_aspect_term_allowed}
+                implicitOpinionAllowed={settings.implicit_opinion_term_allowed}
+                autoCleanPhrases={settings.auto_clean_phrases}
+                annotations={manualTriplets}
+                onAddAnnotation={t => setManualTriplets(p => [...p, t])}
+                onRemoveAnnotation={id => setManualTriplets(p => p.filter(m => m.id !== id))} />
+            </div>
+          )}
         </section>
 
-
-        {/* 2. BOTTOM SECTION (~35% height) */}
-        <section className="flex-1 min-h-[160px] grid grid-cols-1 lg:grid-cols-12 gap-3 md:gap-4 overflow-hidden">
-
-          {/* Bottom-Left: Helper Agent Chatbox (Span 8 columns on large screens) */}
-          <div className="lg:col-span-8 h-full overflow-hidden">
+        {/* Bottom: chat panel (when visible) */}
+        {showChat && (
+          <div className="h-48 min-h-[120px] flex-shrink-0">
             <HelperAgentChatbox
               initialReasoning={currentData.agent_initial_reasoning}
               messages={chatMessages}
@@ -320,38 +285,30 @@ export default function App() {
               isLoading={isChatLoading}
             />
           </div>
-
-          {/* Bottom-Right: Prominent Action Button (Span 4 columns) */}
-          <div className="lg:col-span-4 h-full flex flex-col justify-end">
-            <button
-              onClick={handleNextReview}
-              className="group relative w-full h-full min-h-[90px] max-h-36 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 active:scale-[0.99] text-white rounded-2xl shadow-2xl transition-all duration-200 p-6 flex flex-col items-center justify-center text-center overflow-hidden border border-white/20 select-none cursor-pointer"
-            >
-              <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
-
-              <span className="text-xs uppercase tracking-widest text-blue-200 font-mono mb-1 flex items-center gap-1.5">
-                <span>SEÇİMLERİ KAYDET & GEÇ</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              </span>
-
-              <span className="text-2xl md:text-3xl font-black tracking-tight drop-shadow uppercase block">
-                press for next review
-              </span>
-
-              <span className="text-[11px] text-indigo-200 mt-2 opacity-80 group-hover:opacity-100 transition-opacity">
-                (Sıradaki inceleme satırını yükler)
-              </span>
-            </button>
-          </div>
-
-        </section>
-
+        )}
       </main>
 
-      {/* Toast Alert Notification */}
+      {/* Bottom bar: save button + status */}
+      <footer className="h-10 bg-slate-900/90 border-t border-slate-800 px-4 flex items-center justify-between flex-shrink-0 z-20">
+        <span className="text-[10px] text-slate-600 font-mono">
+          {tripletCount} etiket seçildi · {mode === 'manual' ? 'Manuel' : 'Karşılaştırma'} modu
+        </span>
+        <div className="flex items-center gap-2">
+          <button onClick={() => { setManualTriplets([]); setSelectedModelAIds(new Set()); setSelectedModelBIds(new Set()); }}
+            className="text-[10px] px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 transition-colors border border-slate-700 select-none">
+            Temizle
+          </button>
+          <button onClick={handleNextReview}
+            className="text-[11px] px-4 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold transition-all shadow-sm select-none flex items-center gap-1.5">
+            <span>Kaydet & Geç</span>
+            <span className="text-blue-200">▶</span>
+          </button>
+        </div>
+      </footer>
+
       {saveToast && (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-900 border border-emerald-500/50 text-emerald-300 px-5 py-3 rounded-2xl shadow-2xl z-50 flex items-center space-x-3 text-sm font-semibold animate-fade-in backdrop-blur-md">
-          <span>{saveToast}</span>
+        <div className="fixed bottom-14 left-1/2 -translate-x-1/2 bg-slate-900 border border-emerald-500/50 text-emerald-300 px-4 py-2 rounded-xl shadow-2xl z-50 flex items-center text-xs font-semibold backdrop-blur-md">
+          {saveToast}
         </div>
       )}
     </div>

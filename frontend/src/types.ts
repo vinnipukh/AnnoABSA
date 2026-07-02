@@ -5,8 +5,29 @@ export interface TripletItem {
   aspect_term: string;
   aspect_category: string;
   sentiment_polarity: 'positive' | 'negative' | 'neutral' | string;
+  opinion_term?: string;
+  at_start?: number | null;
+  at_end?: number | null;
+  ot_start?: number | null;
+  ot_end?: number | null;
   isSelected?: boolean;
 }
+
+/** AspectItem used by phraseColoring.tsx for highlighted inline annotations */
+export interface AspectItem {
+  aspect_term?: string;
+  opinion_term?: string;
+  sentiment_polarity?: string;
+  aspect_category?: string;
+  at_start?: number;
+  at_end?: number;
+  ot_start?: number;
+  ot_end?: number;
+  colorIndex?: number;
+}
+
+/** ColorClasses placeholder — used by phraseColoring.tsx import, resolved at runtime */
+export type ColorClasses = string;
 
 export interface ReviewComparisonData {
   id: number;
