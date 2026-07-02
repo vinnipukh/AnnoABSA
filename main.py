@@ -12,6 +12,37 @@ import json
 import os
 from fastapi import HTTPException
 
+# ── Prompt template defaults (Turkish, configurable) ──────────────
+
+DEFAULT_LABELING_TEMPLATE = (
+    "Aşağıdaki duygu unsuru tanımlarına göre:\n"
+    "\n"
+    "- 'aspect term' (görünüş terimi), kullanıcının bir ürün veya hizmetin belirli bir özelliği "
+    "hakkında görüş belirttiği, metindeki tam kelime veya kelime öbeğidir. {implicit_aspect_note}\n"
+    "- 'aspect category' (görünüş kategorisi), görünüşün ait olduğu kategoridir. Mevcut kategoriler "
+    "(bu kategori adlarını İngilizce olduğu gibi bırakın, çevirmeyin): {aspect_categories}\n"
+    "- 'sentiment polarity' (duygu kutbu), ifade edilen görüşün olumluluk, olumsuzluk ya da nötrlük "
+    "derecesidir. Mevcut kutuplar (İngilizce olduğu gibi bırakın, çevirmeyin): {polarities}\n"
+    "- 'opinion term' (görüş terimi), kullanıcının bir görünüşe yönelik tutumunu ifade eden, "
+    "metindeki tam kelime veya kelime öbeğidir. {implicit_opinion_note}\n"
+    "\n"
+    "Metin Türkçedir ve Türkçe sondan eklemeli (agglutinative) bir dildir: aynı kök farklı çekim "
+    "ekleriyle görünebilir (ör. \"kitap\", \"kitabı\", \"kitaplarımdan\"). Görünüş ve görüş "
+    "terimlerini ararken kelimenin metindeki tam, çekimli halini seçin — kökü ayırıp yeniden "
+    "yazmayın.\n"
+    "\n"
+    "Aşağıdaki metindeki tüm duygu unsurlarını, karşılık gelen {element_names} ile birlikte, her "
+    "biri {element_keys} anahtarlarına sahip nesnelerden oluşan bir liste biçiminde tanıyın."
+)
+
+DEFAULT_CHAT_TEMPLATE = (
+    'Sen ABSA (Aspect-Based Sentiment Analysis) veri etiketleme asistanısın. '
+    'Şu incelemeyi tartışıyorsunuz: "{review_text}". '
+    '{model_a_name} tripletleri: {model_a_triplets}, '
+    '{model_b_name} tripletleri: {model_b_triplets}. '
+    "Kullanıcıya mantıklı, akıl yürüterek açıklama yap."
+)
+
 app = FastAPI()
 
 # Global variable to store the data file path and type
@@ -79,7 +110,9 @@ def load_config():
         "compare_model_a_csv": None,
         "compare_model_a_name": None,
         "compare_model_b_csv": None,
-        "compare_model_b_name": None
+        "compare_model_b_name": None,
+        "labeling_prompt_template": DEFAULT_LABELING_TEMPLATE,
+        "helper_agent_prompt_template": DEFAULT_CHAT_TEMPLATE
     }
 
 
@@ -674,7 +707,7 @@ def manual_auto_add_positions():
             status_code=500, detail=f"Error adding position data: {str(e)}")
 
 
-def predict_llm(text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms=False, allow_implicit_opinion_terms=False, n_few_shot=10, llm_model="gemma3:4b"):
+def predict_llm(text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms=False, allow_implicit_opinion_terms=False, n_few_shot=10, llm_model="gemma3:4b", prompt_template=None):
     """Predict sentiment elements using Ollama (backward-compatible wrapper)."""
     from ollama import generate
     import json
@@ -682,7 +715,8 @@ def predict_llm(text, considered_sentiment_elements, examples, aspect_categories
     prompt, few_shot_examples = build_prediction_prompt(
         text, considered_sentiment_elements, examples,
         aspect_categories, polarities,
-        allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot
+        allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot,
+        prompt_template=prompt_template
     )
     Aspects, _, _ = build_absa_models(
         text, considered_sentiment_elements, polarities,
@@ -705,7 +739,7 @@ def predict_llm(text, considered_sentiment_elements, examples, aspect_categories
         return json.loads(response.response), few_shot_examples
 
 
-def predict_openai(text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms=False, allow_implicit_opinion_terms=False, n_few_shot=10, llm_model="gpt-4o-2024-08-06", openai_key=None):
+def predict_openai(text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms=False, allow_implicit_opinion_terms=False, n_few_shot=10, llm_model="gpt-4o-2024-08-06", openai_key=None, prompt_template=None):
     """Predict sentiment elements using OpenAI (backward-compatible wrapper)."""
     from openai import OpenAI
     import json
@@ -718,7 +752,8 @@ def predict_openai(text, considered_sentiment_elements, examples, aspect_categor
     prompt, few_shot_examples = build_prediction_prompt(
         text, considered_sentiment_elements, examples,
         aspect_categories, polarities,
-        allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot
+        allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot,
+        prompt_template=prompt_template
     )
     Aspects, _, _ = build_absa_models(
         text, considered_sentiment_elements, polarities,
@@ -843,52 +878,90 @@ def find_valid_phrases_list(text, max_tokens_in_phrase=None):
     return phrases
 
 
-def build_prediction_prompt(text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot):
+def build_prediction_prompt(text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, prompt_template=None):
     """Build the ABSA prediction prompt and retrieve few-shot examples.
 
     Shared by all LLM provider adapters. Returns (prompt_str, few_shot_examples).
+
+    When prompt_template is provided (str), uses it with .format() substitution
+    — placeholders: {implicit_aspect_note}, {implicit_opinion_note},
+    {aspect_categories}, {polarities}, {element_names}, {element_keys}.
+    When prompt_template is None, falls back to the original hardcoded English prompt.
     """
-    prompt_head = "According to the following sentiment elements definition: \n\n"
-
-    if "aspect_term" in considered_sentiment_elements:
-        prompt_head += "- The 'aspect term' is the exact word or phrase in the text that represents a specific feature, attribute, or aspect of a product or service that a user may express an opinion about. "
-        if allow_implicit_aspect_terms:
-            prompt_head += "The aspect term might be 'NULL' for implicit aspect."
-        prompt_head += "\n"
-    if "aspect_category" in considered_sentiment_elements:
-        prompt_head += f"- The 'aspect category' refers to the category that aspect belongs to, and the available categories includes: {', '.join(aspect_categories)}.\n"
-    if "sentiment_polarity" in considered_sentiment_elements:
-        prompt_head += f"- The 'sentiment polarity' refers to the degree of positivity, negativity or neutrality expressed in the opinion towards a particular aspect or feature of a product or service, and the available polarities include: {', '.join(polarities)}.\n"
-    if "opinion_term" in considered_sentiment_elements:
-        prompt_head += "- The 'opinion term' is the exact word or phrase in the text that refers to the sentiment or attitude expressed by a user towards a particular aspect or feature of a product or service. "
-        if allow_implicit_opinion_terms:
-            prompt_head += "The opinion term might be 'NULL' for implicit opinion."
-        prompt_head += "\n"
-
-    prompt_head += "\nRecognize all sentiment elements with their corresponding "
-    for element in considered_sentiment_elements:
-        prompt_head += element.replace("_", " ") + "s, "
-    prompt_head = prompt_head[:-2]
-    prompt_head += " in the following text in the form of a list of objects, each object having key(s) "
-    for element in considered_sentiment_elements:
-        prompt_head += f"'{element.replace('_', ' ')}', "
-    prompt_head = prompt_head[:-2]
-    prompt_head += ".\n\n"
-
     few_shot_examples = get_most_similar_examples(text, examples, n=n_few_shot)
 
-    prompt = prompt_head + "Here are some examples:\n"
-    for ex in few_shot_examples:
-        prompt += f"Text: {ex['text']}\n"
-        prompt += "Sentiment elements: ["
-        for label in ex['label']:
-            prompt += "("
-            for element in considered_sentiment_elements:
-                prompt += f"'{element.replace('_', ' ')}': '{label[element]}', "
+    if prompt_template is not None:
+        # ── Template-based (configurable) prompt ──────────────────────
+        implicit_aspect_note = (
+            "Görünüş terimi örtük (implicit) ise 'NULL' olabilir."
+            if allow_implicit_aspect_terms else ""
+        )
+        implicit_opinion_note = (
+            "Görüş terimi örtük (implicit) ise 'NULL' olabilir."
+            if allow_implicit_opinion_terms else ""
+        )
+        aspect_categories_str = ", ".join(aspect_categories)
+        polarities_str = ", ".join(polarities)
+        element_names_str = ", ".join(
+            e.replace("_", " ") + "s" for e in considered_sentiment_elements
+        )
+        element_keys_str = ", ".join(
+            f"'{e.replace('_', ' ')}'" for e in considered_sentiment_elements
+        )
+
+        prompt_head = prompt_template.format(
+            implicit_aspect_note=implicit_aspect_note,
+            implicit_opinion_note=implicit_opinion_note,
+            aspect_categories=aspect_categories_str,
+            polarities=polarities_str,
+            element_names=element_names_str,
+            element_keys=element_keys_str,
+        )
+    else:
+        # ── Original hardcoded English prompt (backward compat) ──────
+        prompt_head = "According to the following sentiment elements definition: \n\n"
+
+        if "aspect_term" in considered_sentiment_elements:
+            prompt_head += "- The 'aspect term' is the exact word or phrase in the text that represents a specific feature, attribute, or aspect of a product or service that a user may express an opinion about. "
+            if allow_implicit_aspect_terms:
+                prompt_head += "The aspect term might be 'NULL' for implicit aspect."
+            prompt_head += "\n"
+        if "aspect_category" in considered_sentiment_elements:
+            prompt_head += f"- The 'aspect category' refers to the category that aspect belongs to, and the available categories includes: {', '.join(aspect_categories)}.\n"
+        if "sentiment_polarity" in considered_sentiment_elements:
+            prompt_head += f"- The 'sentiment polarity' refers to the degree of positivity, negativity or neutrality expressed in the opinion towards a particular aspect or feature of a product or service, and the available polarities include: {', '.join(polarities)}.\n"
+        if "opinion_term" in considered_sentiment_elements:
+            prompt_head += "- The 'opinion term' is the exact word or phrase in the text that refers to the sentiment or attitude expressed by a user towards a particular aspect or feature of a product or service. "
+            if allow_implicit_opinion_terms:
+                prompt_head += "The opinion term might be 'NULL' for implicit opinion."
+            prompt_head += "\n"
+
+        prompt_head += "\nRecognize all sentiment elements with their corresponding "
+        for element in considered_sentiment_elements:
+            prompt_head += element.replace("_", " ") + "s, "
+        prompt_head = prompt_head[:-2]
+        prompt_head += " in the following text in the form of a list of objects, each object having key(s) "
+        for element in considered_sentiment_elements:
+            prompt_head += f"'{element.replace('_', ' ')}', "
+        prompt_head = prompt_head[:-2]
+        prompt_head += ".\n\n"
+
+    # ── Common suffix: few-shot examples + target text ──────────────
+    if few_shot_examples:
+        prompt = prompt_head + "Here are some examples:\n"
+        for ex in few_shot_examples:
+            prompt += f"Text: {ex['text']}\n"
+            prompt += "Sentiment elements: ["
+            for label in ex['label']:
+                prompt += "("
+                for element in considered_sentiment_elements:
+                    prompt += f"'{element.replace('_', ' ')}': '{label[element]}', "
+                prompt = prompt[:-2]
+                prompt += "), "
             prompt = prompt[:-2]
-            prompt += "), "
-        prompt = prompt[:-2]
-        prompt += "]\n"
+            prompt += "]\n"
+    else:
+        prompt = prompt_head
     prompt += f"Text: {text}\nSentiment elements: "
 
     return prompt, few_shot_examples
@@ -938,7 +1011,7 @@ class OllamaProvider:
     def __init__(self, config: dict):
         self.config = config
 
-    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model):
+    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None):
         """Predict ABSA triplets via Ollama."""
         from ollama import generate
         import json
@@ -946,7 +1019,8 @@ class OllamaProvider:
         prompt, few_shot_examples = build_prediction_prompt(
             text, considered_sentiment_elements, examples,
             aspect_categories, polarities,
-            allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot
+            allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot,
+            prompt_template=prompt_template
         )
         Aspects, _, _ = build_absa_models(
             text, considered_sentiment_elements, polarities,
@@ -982,7 +1056,7 @@ class OpenAIProvider:
     def __init__(self, config: dict):
         self.config = config
 
-    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model):
+    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None):
         """Predict ABSA triplets via OpenAI structured output."""
         from openai import OpenAI
         import json
@@ -995,7 +1069,8 @@ class OpenAIProvider:
         prompt, few_shot_examples = build_prediction_prompt(
             text, considered_sentiment_elements, examples,
             aspect_categories, polarities,
-            allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot
+            allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot,
+            prompt_template=prompt_template
         )
         Aspects, _, _ = build_absa_models(
             text, considered_sentiment_elements, polarities,
@@ -1050,7 +1125,7 @@ class AnthropicProvider:
     def __init__(self, config: dict):
         self.config = config
 
-    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model):
+    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None):
         """Predict ABSA triplets via Anthropic."""
         from anthropic import Anthropic
         import json
@@ -1064,7 +1139,8 @@ class AnthropicProvider:
         prompt, few_shot_examples = build_prediction_prompt(
             text, considered_sentiment_elements, examples,
             aspect_categories, polarities,
-            allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot
+            allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot,
+            prompt_template=prompt_template
         )
         Aspects, _, _ = build_absa_models(
             text, considered_sentiment_elements, polarities,
@@ -1123,7 +1199,7 @@ class VLLMProvider:
     def __init__(self, config: dict):
         self.config = config
 
-    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model):
+    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None):
         """Predict ABSA triplets via vLLM (OpenAI-compatible API)."""
         from openai import OpenAI
         import json
@@ -1137,7 +1213,8 @@ class VLLMProvider:
         prompt, few_shot_examples = build_prediction_prompt(
             text, considered_sentiment_elements, examples,
             aspect_categories, polarities,
-            allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot
+            allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot,
+            prompt_template=prompt_template
         )
         Aspects, _, _ = build_absa_models(
             text, considered_sentiment_elements, polarities,
@@ -1290,6 +1367,7 @@ def get_ai_prediction(data_idx: int):
             )
 
         provider = get_provider(provider_name, CONFIG_DATA)
+        prompt_template = CONFIG_DATA.get('labeling_prompt_template', DEFAULT_LABELING_TEMPLATE)
         predictions = provider.predict(
             text,
             config.get('sentiment_elements', [
@@ -1303,7 +1381,8 @@ def get_ai_prediction(data_idx: int):
             allow_implicit_opinion_terms=config.get(
                 'implicit_opinion_term_allowed', False),
             n_few_shot=config.get('n_few_shot', 10),
-            llm_model=config.get('llm_model', 'gemma3:4b')
+            llm_model=config.get('llm_model', 'gemma3:4b'),
+            prompt_template=prompt_template
         )[0]
         predictions = predictions["aspects"]
 
@@ -1437,8 +1516,16 @@ def agent_chat(req: AgentChatRequest):
         provider_name = 'openai'
 
     # Build chat messages
+    chat_template = CONFIG_DATA.get('helper_agent_prompt_template', DEFAULT_CHAT_TEMPLATE)
+    system_content = chat_template.format(
+        review_text=req.review_text,
+        model_a_name=model_a_name,
+        model_a_triplets=req.model_a_triplets,
+        model_b_name=model_b_name,
+        model_b_triplets=req.model_b_triplets,
+    )
     messages = [
-        {"role": "system", "content": f"Sen ABSA (Aspect-Based Sentiment Analysis) veri etiketleme asistanısın. Şu incelemeyi tartışıyorsunuz: \"{req.review_text}\". {model_a_name} tripletleri: {req.model_a_triplets}, {model_b_name} tripletleri: {req.model_b_triplets}. Kullanıcıya mantıklı, akıl yürüterek açıklama yap."}
+        {"role": "system", "content": system_content}
     ]
     for h in req.chat_history[-4:]:
         role = "assistant" if h.get("sender") == "agent" else "user"

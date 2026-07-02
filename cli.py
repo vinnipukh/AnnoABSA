@@ -19,6 +19,37 @@ from typing import List, Dict, Any
 import ast
 import pandas as pd
 
+# ── Prompt template defaults (mirrored from main.py to avoid import-time side effects) ──
+
+CLI_DEFAULT_LABELING_TEMPLATE = (
+    "Aşağıdaki duygu unsuru tanımlarına göre:\n"
+    "\n"
+    "- 'aspect term' (görünüş terimi), kullanıcının bir ürün veya hizmetin belirli bir özelliği "
+    "hakkında görüş belirttiği, metindeki tam kelime veya kelime öbeğidir. {implicit_aspect_note}\n"
+    "- 'aspect category' (görünüş kategorisi), görünüşün ait olduğu kategoridir. Mevcut kategoriler "
+    "(bu kategori adlarını İngilizce olduğu gibi bırakın, çevirmeyin): {aspect_categories}\n"
+    "- 'sentiment polarity' (duygu kutbu), ifade edilen görüşün olumluluk, olumsuzluk ya da nötrlük "
+    "derecesidir. Mevcut kutuplar (İngilizce olduğu gibi bırakın, çevirmeyin): {polarities}\n"
+    "- 'opinion term' (görüş terimi), kullanıcının bir görünüşe yönelik tutumunu ifade eden, "
+    "metindeki tam kelime veya kelime öbeğidir. {implicit_opinion_note}\n"
+    "\n"
+    "Metin Türkçedir ve Türkçe sondan eklemeli (agglutinative) bir dildir: aynı kök farklı çekim "
+    "ekleriyle görünebilir (ör. \"kitap\", \"kitabı\", \"kitaplarımdan\"). Görünüş ve görüş "
+    "terimlerini ararken kelimenin metindeki tam, çekimli halini seçin — kökü ayırıp yeniden "
+    "yazmayın.\n"
+    "\n"
+    "Aşağıdaki metindeki tüm duygu unsurlarını, karşılık gelen {element_names} ile birlikte, her "
+    "biri {element_keys} anahtarlarına sahip nesnelerden oluşan bir liste biçiminde tanıyın."
+)
+
+CLI_DEFAULT_CHAT_TEMPLATE = (
+    'Sen ABSA (Aspect-Based Sentiment Analysis) veri etiketleme asistanısın. '
+    'Şu incelemeyi tartışıyorsunuz: "{review_text}". '
+    '{model_a_name} tripletleri: {model_a_triplets}, '
+    '{model_b_name} tripletleri: {model_b_triplets}. '
+    "Kullanıcıya mantıklı, akıl yürüterek açıklama yap."
+)
+
 # Global variable to track backend process
 backend_process = None
 shutdown_flag = threading.Event()
@@ -86,7 +117,9 @@ class ABSAAnnotatorConfig:
             "compare_model_a_csv": None,
             "compare_model_a_name": None,
             "compare_model_b_csv": None,
-            "compare_model_b_name": None
+            "compare_model_b_name": None,
+            "labeling_prompt_template": CLI_DEFAULT_LABELING_TEMPLATE,
+            "helper_agent_prompt_template": CLI_DEFAULT_CHAT_TEMPLATE
         }
 
     def set_sentiment_elements(self, elements: List[str]) -> None:
