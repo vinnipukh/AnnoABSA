@@ -77,7 +77,12 @@ class ABSAAnnotatorConfig:
             "disable_ai_automatic_prediction": False,
             "annotation_guideline": None,
             "n_few_shot": 10,
+            "llm_provider": None,
+            "llm_model": "gemma3:4b",
             "openai_key": None,
+            "anthropic_key": None,
+            "vllm_url": None,
+            "vllm_model": None,
             "compare_model_a_csv": None,
             "compare_model_a_name": None,
             "compare_model_b_csv": None,
@@ -168,6 +173,30 @@ class ABSAAnnotatorConfig:
             raise ValueError("Number of few-shot examples must be non-negative")
         self.config["n_few_shot"] = n_few_shot
 
+    def set_llm_provider(self, provider: str) -> None:
+        """Set the LLM provider (openai, ollama, anthropic, vllm)."""
+        valid = ["openai", "ollama", "anthropic", "vllm"]
+        provider = provider.lower().strip()
+        if provider not in valid:
+            raise ValueError(f"Invalid LLM provider: {provider}. Valid options: {valid}")
+        self.config["llm_provider"] = provider
+
+    def set_llm_model(self, model: str) -> None:
+        """Set the LLM model name."""
+        self.config["llm_model"] = model
+
+    def set_anthropic_key(self, anthropic_key: str) -> None:
+        """Set the Anthropic API key."""
+        self.config["anthropic_key"] = anthropic_key
+
+    def set_vllm_url(self, vllm_url: str) -> None:
+        """Set the vLLM server base URL."""
+        self.config["vllm_url"] = vllm_url
+
+    def set_vllm_model(self, vllm_model: str) -> None:
+        """Set the vLLM model name."""
+        self.config["vllm_model"] = vllm_model
+
     def set_compare_model_a_csv(self, csv_path: str) -> None:
         """Set the CSV path for comparison Model A."""
         self.config["compare_model_a_csv"] = csv_path
@@ -238,13 +267,18 @@ class ABSAAnnotatorConfig:
             f"🔍 Implicit Aspect terms: {'✅' if self.config['implicit_aspect_term_allowed'] else '❌'}")
         print(
             f"💭 Implicit Opinion terms: {'✅' if self.config['implicit_opinion_term_allowed'] else '❌'}")
-        print(
-            f"🔧 Auto-add Positions: {'✅' if self.config['auto_positions'] else '❌'}")
+        print(f"🔧 Auto-add Positions: {'✅' if self.config['auto_positions'] else '❌'}")
         print(f"🎯 Few-shot Examples: {self.config['n_few_shot']}")
-        if self.config.get('openai_key'):
-            print(f"🤖 AI Provider: OpenAI (API Key configured)")
-        else:
-            print(f"🤖 AI Provider: Local LLM (Ollama)")
+        provider = self.config.get('llm_provider', 'ollama')
+        model = self.config.get('llm_model', 'gemma3:4b')
+        print(f"🤖 LLM Provider: {provider} (model: {model})")
+        if provider == 'openai' and self.config.get('openai_key'):
+            print(f"   🔑 OpenAI key: configured")
+        elif provider == 'anthropic' and self.config.get('anthropic_key'):
+            print(f"   🔑 Anthropic key: configured")
+        elif provider == 'vllm' and self.config.get('vllm_url'):
+            vllm_model = self.config.get('vllm_model') or model
+            print(f"   🔗 vLLM URL: {self.config['vllm_url']} (model: {vllm_model})")
 
 
 def start_backend(port: int = 8000, host: str = "localhost", data_path: str = None, config: ABSAAnnotatorConfig = None):
@@ -575,13 +609,6 @@ Examples:
     )
 
     parser.add_argument(
-        "--llm-model",
-        metavar="MODEL",
-        default="gemma3:4b",
-        help="Language model for AI predictions (e.g., gemma3:4b for Ollama, gpt-4o-2024-08-06 for OpenAI)"
-    )
-
-    parser.add_argument(
         "--openai-key",
         metavar="API_KEY",
         help="OpenAI API key for using OpenAI models instead of local LLM"
@@ -619,6 +646,37 @@ Examples:
         default=10,
         metavar="N",
         help="Maximum number of few-shot examples to include in LLM prompts (default: 10)"
+    )
+
+    parser.add_argument(
+        "--llm-provider",
+        choices=["openai", "ollama", "anthropic", "vllm"],
+        help="LLM provider for AI predictions (default: auto-detect from --openai-key presence)"
+    )
+
+    parser.add_argument(
+        "--llm-model",
+        metavar="MODEL",
+        default="gemma3:4b",
+        help="Language model for AI predictions (e.g., gemma3:4b for Ollama, gpt-4o-2024-08-06 for OpenAI, claude-sonnet-4-20250514 for Anthropic)"
+    )
+
+    parser.add_argument(
+        "--anthropic-key",
+        metavar="API_KEY",
+        help="Anthropic API key for using Anthropic models"
+    )
+
+    parser.add_argument(
+        "--vllm-url",
+        metavar="URL",
+        help="vLLM server base URL (e.g., http://localhost:8001/v1)"
+    )
+
+    parser.add_argument(
+        "--vllm-model",
+        metavar="MODEL",
+        help="Model name for vLLM (default: uses --llm-model value)"
     )
 
     parser.add_argument(
@@ -810,6 +868,38 @@ Examples:
 
     if args.n_few_shot:
         config.set_n_few_shot(args.n_few_shot)
+
+    # LLM provider: use explicit flag, or derive from openai_key presence
+    if args.llm_provider:
+        config.set_llm_provider(args.llm_provider)
+    elif args.openai_key:
+        config.set_llm_provider("openai")
+    else:
+        config.set_llm_provider("ollama")
+
+    if args.llm_model:
+        config.set_llm_model(args.llm_model)
+
+    if args.anthropic_key:
+        config.set_anthropic_key(args.anthropic_key)
+
+    if args.vllm_url:
+        config.set_vllm_url(args.vllm_url)
+
+    if args.vllm_model:
+        config.set_vllm_model(args.vllm_model)
+
+    # Validate LLM provider has required configuration
+    llm_provider = config.get_config().get("llm_provider")
+    if llm_provider == "openai" and not config.get_config().get("openai_key"):
+        print("❌ Error: LLM provider 'openai' requires --openai-key")
+        sys.exit(1)
+    if llm_provider == "anthropic" and not config.get_config().get("anthropic_key"):
+        print("❌ Error: LLM provider 'anthropic' requires --anthropic-key")
+        sys.exit(1)
+    if llm_provider == "vllm" and not config.get_config().get("vllm_url"):
+        print("❌ Error: LLM provider 'vllm' requires --vllm-url")
+        sys.exit(1)
 
     if args.compare_model_a_csv:
         config.set_compare_model_a_csv(args.compare_model_a_csv)

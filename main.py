@@ -70,6 +70,12 @@ def load_config():
         "store_time": False,
         "display_avg_annotation_time": False,
         "enable_pre_prediction": False,
+        "llm_provider": "ollama",
+        "llm_model": "gemma3:4b",
+        "openai_key": None,
+        "anthropic_key": None,
+        "vllm_url": None,
+        "vllm_model": None,
         "compare_model_a_csv": None,
         "compare_model_a_name": None,
         "compare_model_b_csv": None,
@@ -669,81 +675,19 @@ def manual_auto_add_positions():
 
 
 def predict_llm(text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms=False, allow_implicit_opinion_terms=False, n_few_shot=10, llm_model="gemma3:4b"):
+    """Predict sentiment elements using Ollama (backward-compatible wrapper)."""
     from ollama import generate
-    from pydantic import BaseModel, create_model
+    import json
 
-    prompt_head = "According to the following sentiment elements definition: \n\n"
-
-    if "aspect_term" in considered_sentiment_elements:
-        prompt_head += "- The 'aspect term' is the exact word or phrase in the text that represents a specific feature, attribute, or aspect of a product or service that a user may express an opinion about. "
-        if allow_implicit_aspect_terms:
-            prompt_head += "The aspect term might be 'NULL' for implicit aspect."
-        prompt_head += "\n"
-    if "aspect_category" in considered_sentiment_elements:
-        prompt_head += f"- The 'aspect category' refers to the category that aspect belongs to, and the available categories includes: {', '.join(aspect_categories)}.\n"
-    if "sentiment_polarity" in considered_sentiment_elements:
-        prompt_head += f"- The 'sentiment polarity' refers to the degree of positivity, negativity or neutrality expressed in the opinion towards a particular aspect or feature of a product or service, and the available polarities include: {', '.join(polarities)}.\n"
-    if "opinion_term" in considered_sentiment_elements:
-        prompt_head += "- The 'opinion term' is the exact word or phrase in the text that refers to the sentiment or attitude expressed by a user towards a particular aspect or feature of a product or service. "
-        if allow_implicit_opinion_terms:
-            prompt_head += "The opinion term might be 'NULL' for implicit opinion."
-        prompt_head += "\n"
-
-    prompt_head += "\nRecognize all sentiment elements with their corresponding "
-    for element in considered_sentiment_elements:
-        prompt_head += element.replace("_", " ") + "s, "
-    prompt_head = prompt_head[:-2]  # remove last comma and space
-    prompt_head += " in the following text in the form of a list of objects, each object having key(s) "
-    for element in considered_sentiment_elements:
-        prompt_head += f"'{element.replace('_', ' ')}', "
-    prompt_head = prompt_head[:-2]  # remove last comma and space
-    prompt_head += ".\n\n"
-
-    few_shot_examples = get_most_similar_examples(text, examples, n=n_few_shot)
-
-    prompt = prompt_head + "Here are some examples:\n"
-    for ex in few_shot_examples:
-        prompt += f"Text: {ex['text']}\n"
-        prompt += "Sentiment elements: ["
-        for label in ex['label']:
-            prompt += "("
-            for element in considered_sentiment_elements:
-                prompt += f"'{element.replace('_', ' ')}': '{label[element]}', "
-            prompt = prompt[:-2]  # remove last comma and space
-            prompt += "), "
-        prompt = prompt[:-2]  # remove last comma and space
-        prompt += "]\n"
-    prompt += f"Text: {text}\nSentiment elements: "
-
-
-    from enum import Enum
-    allowed_phrases = find_valid_phrases_list(text)
-    allowed_aspect_terms = allowed_phrases + \
-        ["NULL"] if allow_implicit_aspect_terms else allowed_phrases
-    allowed_opinion_terms = allowed_phrases + \
-        ["NULL"] if allow_implicit_opinion_terms else allowed_phrases
-
-    AspectEnum = Enum("AspectEnum", {p: p for p in allowed_aspect_terms})
-    OpinionEnum = Enum("OpinionEnum", {p: p for p in allowed_opinion_terms})
-    PolarityEnum = Enum("PolarityEnum", {p: p for p in polarities})
-    CategoryEnum = Enum("CategoryEnum", {c: c for c in aspect_categories})
-
-    # Mapping von Namen -> Typen
-    field_types = {
-        "aspect_term": (AspectEnum, ...),
-        "aspect_category": (CategoryEnum, ...),
-        "opinion_term": (OpinionEnum, ...),
-        "sentiment_polarity": (PolarityEnum, ...)
-    }
-
-    # dynamisch Modell bauen
-    SentimentElement = create_model(
-        "SentimentElement",
-        **{name: field_types[name] for name in considered_sentiment_elements}
+    prompt, few_shot_examples = build_prediction_prompt(
+        text, considered_sentiment_elements, examples,
+        aspect_categories, polarities,
+        allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot
     )
-
-    class Aspects(BaseModel):
-        aspects: list[SentimentElement]
+    Aspects, _, _ = build_absa_models(
+        text, considered_sentiment_elements, polarities,
+        aspect_categories, allow_implicit_aspect_terms, allow_implicit_opinion_terms
+    )
 
     response = generate(
         prompt=prompt,
@@ -753,7 +697,6 @@ def predict_llm(text, considered_sentiment_elements, examples, aspect_categories
         format=Aspects.model_json_schema()
     )
 
-    # response.message.content is a JSON string
     aspects = Aspects.model_validate_json(response.response)
 
     if not aspects.aspects:
@@ -763,86 +706,24 @@ def predict_llm(text, considered_sentiment_elements, examples, aspect_categories
 
 
 def predict_openai(text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms=False, allow_implicit_opinion_terms=False, n_few_shot=10, llm_model="gpt-4o-2024-08-06", openai_key=None):
-    """Predict sentiment elements using OpenAI's structured output."""
+    """Predict sentiment elements using OpenAI (backward-compatible wrapper)."""
     from openai import OpenAI
-    from pydantic import BaseModel, create_model
-    from enum import Enum
-    
+    import json
+
     if not openai_key:
         raise ValueError("OpenAI API key is required for OpenAI predictions")
-    
+
     client = OpenAI(api_key=openai_key)
-    
-    # Build dynamic pydantic model based on considered sentiment elements
-    allowed_phrases = find_valid_phrases_list(text)
-    allowed_aspect_terms = allowed_phrases + ["NULL"] if allow_implicit_aspect_terms else allowed_phrases
-    allowed_opinion_terms = allowed_phrases + ["NULL"] if allow_implicit_opinion_terms else allowed_phrases
 
-    AspectEnum = Enum("AspectEnum", {p: p for p in allowed_aspect_terms})
-    OpinionEnum = Enum("OpinionEnum", {p: p for p in allowed_opinion_terms})
-    PolarityEnum = Enum("PolarityEnum", {p: p for p in polarities})
-    CategoryEnum = Enum("CategoryEnum", {c: c for c in aspect_categories})
-
-    # Mapping von Namen -> Typen
-    field_types = {
-        "aspect_term": (AspectEnum, ...),
-        "aspect_category": (CategoryEnum, ...),
-        "opinion_term": (OpinionEnum, ...),
-        "sentiment_polarity": (PolarityEnum, ...)
-    }
-
-    # dynamisch Modell bauen
-    SentimentElement = create_model(
-        "SentimentElement",
-        **{name: field_types[name] for name in considered_sentiment_elements}
+    prompt, few_shot_examples = build_prediction_prompt(
+        text, considered_sentiment_elements, examples,
+        aspect_categories, polarities,
+        allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot
     )
-
-    class Aspects(BaseModel):
-        aspects: list[SentimentElement]
-
-    # Build prompt similar to Ollama version
-    prompt_head = "According to the following sentiment elements definition: \n\n"
-
-    if "aspect_term" in considered_sentiment_elements:
-        prompt_head += "- The 'aspect term' is the exact word or phrase in the text that represents a specific feature, attribute, or aspect of a product or service that a user may express an opinion about. "
-        if allow_implicit_aspect_terms:
-            prompt_head += "The aspect term might be 'NULL' for implicit aspect."
-        prompt_head += "\n"
-    if "aspect_category" in considered_sentiment_elements:
-        prompt_head += f"- The 'aspect category' refers to the category that aspect belongs to, and the available categories includes: {', '.join(aspect_categories)}.\n"
-    if "sentiment_polarity" in considered_sentiment_elements:
-        prompt_head += f"- The 'sentiment polarity' refers to the degree of positivity, negativity or neutrality expressed in the opinion towards a particular aspect or feature of a product or service, and the available polarities include: {', '.join(polarities)}.\n"
-    if "opinion_term" in considered_sentiment_elements:
-        prompt_head += "- The 'opinion term' is the exact word or phrase in the text that refers to the sentiment or attitude expressed by a user towards a particular aspect or feature of a product or service. "
-        if allow_implicit_opinion_terms:
-            prompt_head += "The opinion term might be 'NULL' for implicit opinion."
-        prompt_head += "\n"
-
-    prompt_head += "\nRecognize all sentiment elements with their corresponding "
-    for element in considered_sentiment_elements:
-        prompt_head += element.replace("_", " ") + "s, "
-    prompt_head = prompt_head[:-2]  # remove last comma and space
-    prompt_head += " in the following text in the form of a list of objects, each object having key(s) "
-    for element in considered_sentiment_elements:
-        prompt_head += f"'{element.replace('_', ' ')}', "
-    prompt_head = prompt_head[:-2]  # remove last comma and space
-    prompt_head += ".\n\n"
-
-    few_shot_examples = get_most_similar_examples(text, examples, n=n_few_shot)
-
-    prompt = prompt_head + "Here are some examples:\n"
-    for ex in few_shot_examples:
-        prompt += f"Text: {ex['text']}\n"
-        prompt += "Sentiment elements: ["
-        for label in ex['label']:
-            prompt += "("
-            for element in considered_sentiment_elements:
-                prompt += f"'{element.replace('_', ' ')}': '{label[element]}', "
-            prompt = prompt[:-2]  # remove last comma and space
-            prompt += "), "
-        prompt = prompt[:-2]  # remove last comma and space
-        prompt += "]\n"
-    prompt += f"Text: {text}\nSentiment elements: "
+    Aspects, _, _ = build_absa_models(
+        text, considered_sentiment_elements, polarities,
+        aspect_categories, allow_implicit_aspect_terms, allow_implicit_opinion_terms
+    )
 
     try:
         print("🔍 Sending request to OpenAI...")
@@ -962,6 +843,377 @@ def find_valid_phrases_list(text, max_tokens_in_phrase=None):
     return phrases
 
 
+def build_prediction_prompt(text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot):
+    """Build the ABSA prediction prompt and retrieve few-shot examples.
+
+    Shared by all LLM provider adapters. Returns (prompt_str, few_shot_examples).
+    """
+    prompt_head = "According to the following sentiment elements definition: \n\n"
+
+    if "aspect_term" in considered_sentiment_elements:
+        prompt_head += "- The 'aspect term' is the exact word or phrase in the text that represents a specific feature, attribute, or aspect of a product or service that a user may express an opinion about. "
+        if allow_implicit_aspect_terms:
+            prompt_head += "The aspect term might be 'NULL' for implicit aspect."
+        prompt_head += "\n"
+    if "aspect_category" in considered_sentiment_elements:
+        prompt_head += f"- The 'aspect category' refers to the category that aspect belongs to, and the available categories includes: {', '.join(aspect_categories)}.\n"
+    if "sentiment_polarity" in considered_sentiment_elements:
+        prompt_head += f"- The 'sentiment polarity' refers to the degree of positivity, negativity or neutrality expressed in the opinion towards a particular aspect or feature of a product or service, and the available polarities include: {', '.join(polarities)}.\n"
+    if "opinion_term" in considered_sentiment_elements:
+        prompt_head += "- The 'opinion term' is the exact word or phrase in the text that refers to the sentiment or attitude expressed by a user towards a particular aspect or feature of a product or service. "
+        if allow_implicit_opinion_terms:
+            prompt_head += "The opinion term might be 'NULL' for implicit opinion."
+        prompt_head += "\n"
+
+    prompt_head += "\nRecognize all sentiment elements with their corresponding "
+    for element in considered_sentiment_elements:
+        prompt_head += element.replace("_", " ") + "s, "
+    prompt_head = prompt_head[:-2]
+    prompt_head += " in the following text in the form of a list of objects, each object having key(s) "
+    for element in considered_sentiment_elements:
+        prompt_head += f"'{element.replace('_', ' ')}', "
+    prompt_head = prompt_head[:-2]
+    prompt_head += ".\n\n"
+
+    few_shot_examples = get_most_similar_examples(text, examples, n=n_few_shot)
+
+    prompt = prompt_head + "Here are some examples:\n"
+    for ex in few_shot_examples:
+        prompt += f"Text: {ex['text']}\n"
+        prompt += "Sentiment elements: ["
+        for label in ex['label']:
+            prompt += "("
+            for element in considered_sentiment_elements:
+                prompt += f"'{element.replace('_', ' ')}': '{label[element]}', "
+            prompt = prompt[:-2]
+            prompt += "), "
+        prompt = prompt[:-2]
+        prompt += "]\n"
+    prompt += f"Text: {text}\nSentiment elements: "
+
+    return prompt, few_shot_examples
+
+
+def build_absa_models(text, considered_sentiment_elements, polarities, aspect_categories, allow_implicit_aspect_terms, allow_implicit_opinion_terms):
+    """Build dynamic Pydantic model and Enums for structured ABSA output.
+
+    Returns (Aspects_model, field_types_dict, enums_dict).
+    Shared by all LLM provider adapters that use structured JSON output.
+    """
+    from pydantic import BaseModel, create_model
+    from enum import Enum
+
+    allowed_phrases = find_valid_phrases_list(text)
+    allowed_aspect_terms = allowed_phrases + \
+        ["NULL"] if allow_implicit_aspect_terms else allowed_phrases
+    allowed_opinion_terms = allowed_phrases + \
+        ["NULL"] if allow_implicit_opinion_terms else allowed_phrases
+
+    AspectEnum = Enum("AspectEnum", {p: p for p in allowed_aspect_terms})
+    OpinionEnum = Enum("OpinionEnum", {p: p for p in allowed_opinion_terms})
+    PolarityEnum = Enum("PolarityEnum", {p: p for p in polarities})
+    CategoryEnum = Enum("CategoryEnum", {c: c for c in aspect_categories})
+
+    field_types = {
+        "aspect_term": (AspectEnum, ...),
+        "aspect_category": (CategoryEnum, ...),
+        "opinion_term": (OpinionEnum, ...),
+        "sentiment_polarity": (PolarityEnum, ...)
+    }
+
+    SentimentElement = create_model(
+        "SentimentElement",
+        **{name: field_types[name] for name in considered_sentiment_elements}
+    )
+
+    class Aspects(BaseModel):
+        aspects: list[SentimentElement]
+
+    return Aspects, field_types, {"AspectEnum": AspectEnum, "OpinionEnum": OpinionEnum, "PolarityEnum": PolarityEnum, "CategoryEnum": CategoryEnum}
+
+
+class OllamaProvider:
+    """LLM provider adapter for Ollama (local)."""
+
+    def __init__(self, config: dict):
+        self.config = config
+
+    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model):
+        """Predict ABSA triplets via Ollama."""
+        from ollama import generate
+        import json
+
+        prompt, few_shot_examples = build_prediction_prompt(
+            text, considered_sentiment_elements, examples,
+            aspect_categories, polarities,
+            allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot
+        )
+        Aspects, _, _ = build_absa_models(
+            text, considered_sentiment_elements, polarities,
+            aspect_categories, allow_implicit_aspect_terms, allow_implicit_opinion_terms
+        )
+
+        response = generate(
+            prompt=prompt,
+            model=llm_model,
+            raw=True,
+            options={"temperature": 0.0, "max_tokens": 1024},
+            format=Aspects.model_json_schema()
+        )
+        aspects = Aspects.model_validate_json(response.response)
+        if not aspects.aspects:
+            return {"aspects": []}, few_shot_examples
+        return json.loads(response.response), few_shot_examples
+
+    def chat(self, messages, model, temperature=0.7, max_tokens=300):
+        """Send a chat message via Ollama."""
+        from ollama import chat as ollama_chat
+        response = ollama_chat(
+            model=model,
+            messages=messages,
+            options={"temperature": temperature, "max_tokens": max_tokens}
+        )
+        return response["message"]["content"]
+
+
+class OpenAIProvider:
+    """LLM provider adapter for OpenAI-compatible APIs."""
+
+    def __init__(self, config: dict):
+        self.config = config
+
+    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model):
+        """Predict ABSA triplets via OpenAI structured output."""
+        from openai import OpenAI
+        import json
+
+        openai_key = self.config.get("openai_key")
+        if not openai_key:
+            raise ValueError("OpenAI API key is required")
+
+        client = OpenAI(api_key=openai_key)
+        prompt, few_shot_examples = build_prediction_prompt(
+            text, considered_sentiment_elements, examples,
+            aspect_categories, polarities,
+            allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot
+        )
+        Aspects, _, _ = build_absa_models(
+            text, considered_sentiment_elements, polarities,
+            aspect_categories, allow_implicit_aspect_terms, allow_implicit_opinion_terms
+        )
+
+        try:
+            completion = client.beta.chat.completions.parse(
+                model=llm_model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant for aspect-based sentiment analysis. Extract the sentiment elements from the given text according to the provided instructions."},
+                    {"role": "user", "content": prompt},
+                ],
+                response_format=Aspects,
+                temperature=0.0
+            )
+            message = completion.choices[0].message
+            if message.parsed:
+                aspects_data = {"aspects": []}
+                for aspect in message.parsed.aspects:
+                    aspect_dict = {}
+                    for element in considered_sentiment_elements:
+                        aspect_dict[element] = getattr(aspect, element).value
+                    aspects_data["aspects"].append(aspect_dict)
+                return aspects_data, few_shot_examples
+            else:
+                print(f"OpenAI refused the request: {message.refusal}")
+                return {"aspects": []}, few_shot_examples
+        except Exception as e:
+            print(f"Error in OpenAI prediction: {e}")
+            return {"aspects": []}, few_shot_examples
+
+    def chat(self, messages, model, temperature=0.7, max_tokens=300):
+        """Send a chat message via OpenAI."""
+        from openai import OpenAI
+        openai_key = self.config.get("openai_key")
+        if not openai_key:
+            raise ValueError("OpenAI API key is required for chat")
+        client = OpenAI(api_key=openai_key)
+        completion = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+        return completion.choices[0].message.content
+
+
+class AnthropicProvider:
+    """LLM provider adapter for Anthropic."""
+
+    def __init__(self, config: dict):
+        self.config = config
+
+    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model):
+        """Predict ABSA triplets via Anthropic."""
+        from anthropic import Anthropic
+        import json
+
+        anthropic_key = self.config.get("anthropic_key")
+        if not anthropic_key:
+            raise ValueError("Anthropic API key is required")
+
+        client = Anthropic(api_key=anthropic_key)
+
+        prompt, few_shot_examples = build_prediction_prompt(
+            text, considered_sentiment_elements, examples,
+            aspect_categories, polarities,
+            allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot
+        )
+        Aspects, _, _ = build_absa_models(
+            text, considered_sentiment_elements, polarities,
+            aspect_categories, allow_implicit_aspect_terms, allow_implicit_opinion_terms
+        )
+
+        try:
+            response = client.messages.create(
+                model=llm_model or "claude-sonnet-4-20250514",
+                max_tokens=1024,
+                temperature=0.0,
+                system="You are a helpful assistant for aspect-based sentiment analysis. Extract the sentiment elements from the given text according to the provided instructions. Return valid JSON matching the expected schema.",
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            content = response.content[0].text if response.content else "{}"
+            # Extract JSON from the response
+            parsed = json.loads(content)
+            aspects_list = parsed.get("aspects", [])
+            return {"aspects": aspects_list}, few_shot_examples
+        except Exception as e:
+            print(f"Error in Anthropic prediction: {e}")
+            return {"aspects": []}, few_shot_examples
+
+    def chat(self, messages, model, temperature=0.7, max_tokens=300):
+        """Send a chat message via Anthropic."""
+        from anthropic import Anthropic
+        anthropic_key = self.config.get("anthropic_key")
+        if not anthropic_key:
+            raise ValueError("Anthropic API key is required for chat")
+        client = Anthropic(api_key=anthropic_key)
+
+        # Convert OpenAI-style messages to Anthropic format
+        system_content = None
+        anthropic_messages = []
+        for m in messages:
+            if m["role"] == "system":
+                system_content = m["content"]
+            else:
+                anthropic_messages.append({"role": m["role"], "content": m["content"]})
+
+        response = client.messages.create(
+            model=model or "claude-sonnet-4-20250514",
+            max_tokens=max_tokens,
+            temperature=temperature,
+            system=system_content,
+            messages=anthropic_messages if anthropic_messages else [{"role": "user", "content": "Hello"}]
+        )
+        return response.content[0].text
+
+
+class VLLMProvider:
+    """LLM provider adapter for vLLM (OpenAI-compatible)."""
+
+    def __init__(self, config: dict):
+        self.config = config
+
+    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model):
+        """Predict ABSA triplets via vLLM (OpenAI-compatible API)."""
+        from openai import OpenAI
+        import json
+
+        vllm_url = self.config.get("vllm_url")
+        if not vllm_url:
+            raise ValueError("vLLM URL is required")
+
+        client = OpenAI(api_key="EMPTY", base_url=vllm_url)
+
+        prompt, few_shot_examples = build_prediction_prompt(
+            text, considered_sentiment_elements, examples,
+            aspect_categories, polarities,
+            allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot
+        )
+        Aspects, _, _ = build_absa_models(
+            text, considered_sentiment_elements, polarities,
+            aspect_categories, allow_implicit_aspect_terms, allow_implicit_opinion_terms
+        )
+
+        # vLLM may not support beta.chat.completions.parse, so use standard completion + manual parse
+        try:
+            completion = client.chat.completions.create(
+                model=llm_model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant for aspect-based sentiment analysis. Extract the sentiment elements from the given text according to the provided instructions. Return valid JSON matching the expected schema."},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.0,
+                max_tokens=1024
+            )
+            content = completion.choices[0].message.content
+            try:
+                parsed = json.loads(content)
+                aspects_list = parsed.get("aspects", [])
+                return {"aspects": aspects_list}, few_shot_examples
+            except json.JSONDecodeError:
+                print(f"vLLM returned non-JSON response: {content[:200]}")
+                return {"aspects": []}, few_shot_examples
+        except Exception as e:
+            print(f"Error in vLLM prediction: {e}")
+            return {"aspects": []}, few_shot_examples
+
+    def chat(self, messages, model, temperature=0.7, max_tokens=300):
+        """Send a chat message via vLLM (OpenAI-compatible API)."""
+        from openai import OpenAI
+        vllm_url = self.config.get("vllm_url")
+        if not vllm_url:
+            raise ValueError("vLLM URL is required")
+        client = OpenAI(api_key="EMPTY", base_url=vllm_url)
+        completion = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+        return completion.choices[0].message.content
+
+
+# Provider registry: maps provider name → adapter class
+PROVIDER_REGISTRY = {
+    "ollama": OllamaProvider,
+    "openai": OpenAIProvider,
+    "anthropic": AnthropicProvider,
+    "vllm": VLLMProvider,
+}
+
+
+def get_provider(provider_name: str, config: dict):
+    """Factory: instantiate the right provider adapter for the given name.
+
+    Args:
+        provider_name: One of 'ollama', 'openai', 'anthropic', 'vllm'.
+        config: Configuration dict (CONFIG_DATA) containing provider-specific keys.
+
+    Returns:
+        An instance of the corresponding provider adapter class.
+
+    Raises:
+        ValueError: If provider_name is unknown.
+    """
+    provider_name = provider_name.lower().strip()
+    if provider_name not in PROVIDER_REGISTRY:
+        raise ValueError(
+            f"Unknown LLM provider '{provider_name}'. "
+            f"Available: {', '.join(PROVIDER_REGISTRY.keys())}"
+        )
+    return PROVIDER_REGISTRY[provider_name](config)
+
+
 @app.get("/ai_prediction/{data_idx}")
 def get_ai_prediction(data_idx: int):
     try:
@@ -1013,41 +1265,46 @@ def get_ai_prediction(data_idx: int):
         # filter examples that are identical to the requested text
         examples = [ex for ex in examples if ex['text'] != text]
 
-        # Check if OpenAI key is available, use OpenAI if yes, otherwise use Ollama
-        openai_key = config.get('openai_key')
-        if openai_key:
-            predictions = predict_openai(
-                text,
-                config.get('sentiment_elements', [
-                           "aspect_term", "aspect_category", "sentiment_polarity", "opinion_term"]),
-                examples,
-                aspect_categories,
-                config.get('sentiment_polarity_options', [
-                           "positive", "negative", "neutral"]),
-                allow_implicit_aspect_terms=config.get(
-                    'implicit_aspect_term_allowed', True),
-                allow_implicit_opinion_terms=config.get(
-                    'implicit_opinion_term_allowed', False),
-                n_few_shot=config.get('n_few_shot', 10),
-                llm_model=config.get('llm_model', 'gpt-4o-2024-08-06'),
-                openai_key=openai_key
-            )[0]
-        else:
-            predictions = predict_llm(
-                text,
-                config.get('sentiment_elements', [
-                           "aspect_term", "aspect_category", "sentiment_polarity", "opinion_term"]),
-                examples,
-                aspect_categories,
-                config.get('sentiment_polarity_options', [
-                           "positive", "negative", "neutral"]),
-                allow_implicit_aspect_terms=config.get(
-                    'implicit_aspect_term_allowed', True),
-                allow_implicit_opinion_terms=config.get(
-                    'implicit_opinion_term_allowed', False),
-                n_few_shot=config.get('n_few_shot', 10),
-                llm_model=config.get('llm_model', 'gemma3:4b')
-            )[0]
+        # Dispatch to the configured LLM provider via the port/adapter pattern
+        provider_name = CONFIG_DATA.get('llm_provider', 'ollama')
+
+        # Backward compat: if no explicit provider but openai_key is set, prefer OpenAI
+        if not CONFIG_DATA.get('llm_provider') and config.get('openai_key'):
+            provider_name = 'openai'
+
+        # Validate provider configuration
+        if provider_name == 'openai' and not config.get('openai_key'):
+            raise HTTPException(
+                status_code=400,
+                detail="OpenAI provider selected but no API key configured. Use --openai-key."
+            )
+        if provider_name == 'anthropic' and not config.get('anthropic_key'):
+            raise HTTPException(
+                status_code=400,
+                detail="Anthropic provider selected but no API key configured. Use --anthropic-key."
+            )
+        if provider_name == 'vllm' and not config.get('vllm_url'):
+            raise HTTPException(
+                status_code=400,
+                detail="vLLM provider selected but no URL configured. Use --vllm-url."
+            )
+
+        provider = get_provider(provider_name, CONFIG_DATA)
+        predictions = provider.predict(
+            text,
+            config.get('sentiment_elements', [
+                       "aspect_term", "aspect_category", "sentiment_polarity", "opinion_term"]),
+            examples,
+            aspect_categories,
+            config.get('sentiment_polarity_options', [
+                       "positive", "negative", "neutral"]),
+            allow_implicit_aspect_terms=config.get(
+                'implicit_aspect_term_allowed', True),
+            allow_implicit_opinion_terms=config.get(
+                'implicit_opinion_term_allowed', False),
+            n_few_shot=config.get('n_few_shot', 10),
+            llm_model=config.get('llm_model', 'gemma3:4b')
+        )[0]
         predictions = predictions["aspects"]
 
         # if position saving is enabled, add positions to predictions
@@ -1171,32 +1428,44 @@ def save_review_triplets(data_idx: int, req: SaveTripletsRequest):
 @app.post("/agent/chat")
 def agent_chat(req: AgentChatRequest):
     config = load_config()
-    openai_key = config.get("openai_key")
     model_a_name = config.get("compare_model_a_name", "Model A")
     model_b_name = config.get("compare_model_b_name", "Model B")
 
-    if openai_key:
-        try:
-            from openai import OpenAI
-            client = OpenAI(api_key=openai_key)
-            messages = [
-                {"role": "system", "content": f"Sen ABSA (Aspect-Based Sentiment Analysis) veri etiketleme asistanısın. Şu incelemeyi tartışıyorsunuz: \"{req.review_text}\". {model_a_name} tripletleri: {req.model_a_triplets}, {model_b_name} tripletleri: {req.model_b_triplets}. Kullanıcıya mantıklı, akıl yürüterek açıklama yap."}
-            ]
-            for h in req.chat_history[-4:]:
-                role = "assistant" if h.get("sender") == "agent" else "user"
-                messages.append({"role": role, "content": h.get("text", "")})
-            messages.append({"role": "user", "content": req.user_message})
+    # Determine provider (same derivation as get_ai_prediction)
+    provider_name = CONFIG_DATA.get('llm_provider', 'ollama')
+    if not CONFIG_DATA.get('llm_provider') and config.get('openai_key'):
+        provider_name = 'openai'
 
-            comp = client.chat.completions.create(
-                model=config.get("llm_model", "gpt-4o"),
-                messages=messages,
-                temperature=0.7,
-                max_tokens=300
-            )
-            return {"reply": comp.choices[0].message.content}
-        except Exception as e:
-            print("OpenAI chat error:", e)
+    # Build chat messages
+    messages = [
+        {"role": "system", "content": f"Sen ABSA (Aspect-Based Sentiment Analysis) veri etiketleme asistanısın. Şu incelemeyi tartışıyorsunuz: \"{req.review_text}\". {model_a_name} tripletleri: {req.model_a_triplets}, {model_b_name} tripletleri: {req.model_b_triplets}. Kullanıcıya mantıklı, akıl yürüterek açıklama yap."}
+    ]
+    for h in req.chat_history[-4:]:
+        role = "assistant" if h.get("sender") == "agent" else "user"
+        messages.append({"role": role, "content": h.get("text", "")})
+    messages.append({"role": "user", "content": req.user_message})
 
+    # Dispatch to configured provider
+    try:
+        if provider_name == 'openai' and not config.get('openai_key'):
+            raise ValueError("OpenAI provider selected but no API key configured. Use --openai-key.")
+        if provider_name == 'anthropic' and not config.get('anthropic_key'):
+            raise ValueError("Anthropic provider selected but no API key configured. Use --anthropic-key.")
+        if provider_name == 'vllm' and not config.get('vllm_url'):
+            raise ValueError("vLLM provider selected but no URL configured. Use --vllm-url.")
+
+        provider = get_provider(provider_name, CONFIG_DATA)
+        reply = provider.chat(
+            messages=messages,
+            model=config.get("llm_model", "gemma3:4b"),
+            temperature=0.7,
+            max_tokens=300
+        )
+        return {"reply": reply}
+    except Exception as e:
+        print(f"Provider chat error ({provider_name}): {e}")
+
+    # Fallback: hardcoded Turkish rule-based responses (backward compat when no provider configured)
     msg = req.user_message.lower()
     reply = "Helper agent: "
     if "model a" in msg or model_a_name.lower() in msg:
