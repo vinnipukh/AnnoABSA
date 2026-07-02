@@ -307,3 +307,6 @@ export const renderHighlightedText = (displayedText: string, highlights: TextHig
   
   return result;
 };
+
+
+

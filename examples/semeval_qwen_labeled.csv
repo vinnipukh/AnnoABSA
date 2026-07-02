@@ -1,0 +1,10 @@
+review_id,aspect_term,aspect_category,sentiment_polarity
+0,manzara,Restaurant#general,positive
+0,servis,Service#general,neutral
+1,Yemekler,Food#quality,positive
+1,fiyatlar,Food#prices,neutral
+2,Garsonlar,Service#general,negative
+3,Ambiyans,Ambience#general,positive
+3,ana yemek,Food#quality,neutral
+4,Künefe,Food#quality,positive
+4,şerbet,Food#quality,positive

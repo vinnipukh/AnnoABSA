@@ -1,6 +1,9 @@
 import re
 import numpy as np
-from rank_bm25 import BM25Okapi
+try:
+    from rank_bm25 import BM25Okapi
+except ImportError:
+    BM25Okapi = None
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -121,6 +124,17 @@ class AnnotationData(BaseModel):
     name: str
     value: list
 
+class SaveTripletsRequest(BaseModel):
+    triplets: list
+
+class AgentChatRequest(BaseModel):
+    review_text: str
+    deepseek_triplets: list = []
+    qwen_triplets: list = []
+    user_message: str
+    chat_history: list = []
+
+
 # GET Endpoint
 
 
@@ -155,6 +169,74 @@ def get_settings():
     return settings
 
 
+
+
+import ast
+
+def parse_triplet_column(raw_val, prefix="t"):
+    if raw_val is None or str(raw_val).strip() in ["", "nan", "None", "[]"]:
+        return []
+    try:
+        parsed = ast.literal_eval(str(raw_val))
+        res = []
+        if isinstance(parsed, list):
+            for i, item in enumerate(parsed):
+                if isinstance(item, (list, tuple)) and len(item) >= 3:
+                    term = str(item[0]) if item[0] else "NULL"
+                    cat = str(item[1])
+                    pol = str(item[2]).lower()
+                    res.append({
+                        "id": f"{prefix}_{i}",
+                        "aspect_term": term,
+                        "aspect_category": cat,
+                        "sentiment_polarity": pol
+                    })
+                elif isinstance(item, dict):
+                    term = str(item.get("aspect_term", item.get("term", ""))) or "NULL"
+                    cat = str(item.get("aspect_category", item.get("category", "")))
+                    pol = str(item.get("sentiment_polarity", item.get("polarity", ""))).lower()
+                    res.append({
+                        "id": f"{prefix}_{i}",
+                        "aspect_term": term,
+                        "aspect_category": cat,
+                        "sentiment_polarity": pol
+                    })
+        return res
+    except Exception as e:
+        print("Parse error:", e)
+        return []
+
+def generate_mock_reasoning(text: str, ds_list: list, qw_list: list) -> str:
+    if not text:
+        return "Helper agent: İnceleme seçilmedi."
+    ds_aspects = [t.get("aspect_term", "") for t in ds_list if t.get("aspect_term")]
+    qw_aspects = [t.get("aspect_term", "") for t in qw_list if t.get("aspect_term")]
+    
+    common = set(ds_aspects).intersection(set(qw_aspects))
+    only_ds = set(ds_aspects) - set(qw_aspects)
+    only_qw = set(qw_aspects) - set(ds_aspects)
+    
+    reasoning = f"Helper agent: Merhaba! İncelemeyi analiz ettim: **\"{text}\"**.\n\n"
+    if common:
+        reasoning += f"• **Ortak Tespitler:** Her iki model de `{', '.join(common)}` ögelerini doğru yakalamış.\n"
+    if only_ds:
+        reasoning += f"• **DeepSeek Farkı:** DeepSeek ek olarak `{', '.join(only_ds)}` ögesini tespit etmiş. Bağlama göre bu mantıklı.\n"
+    if only_qw:
+        reasoning += f"• **Qwen Farkı:** Qwen ise `{', '.join(only_qw)}` ögesini öne çıkarmış.\n"
+    
+    if ds_list and qw_list:
+        if len(ds_list) >= len(qw_list):
+            reasoning += "\n💡 **Önerim:** DeepSeek duygu polaritelerini daha detaylı ayrıştırmış görünüyor. DeepSeek çıktısını temel alıp eksikleri manuel tamamlayabilirsin."
+        else:
+            reasoning += "\n💡 **Önerim:** Qwen özetlemeyi daha net yapmış. Qwen tripletlerini onaylamanı tavsiye ederim."
+    elif ds_list:
+        reasoning += "\n💡 **Önerim:** Qwen bu satırda çıktı üretmemiş. DeepSeek tripletlerini kontrol edip onaylayabilirsin."
+    elif qw_list:
+        reasoning += "\n💡 **Önerim:** DeepSeek bu satırda çıktı üretmemiş. Qwen tripletlerini seçebilirsin."
+    else:
+        reasoning += "\n💡 **Önerim:** Modeller bu incelemede herhangi bir triplet çıkaramamış. Orta kolondaki formdan manuel giriş yapmalısın."
+        
+    return reasoning
 @app.get("/data/{data_idx}")
 def get_data(data_idx: int):
     try:
@@ -162,50 +244,85 @@ def get_data(data_idx: int):
         if data_idx >= len(data) or data_idx < 0:
             raise HTTPException(status_code=404, detail="Index out of range")
 
-        default_aspects = CONFIG_DATA.get("aspect_categories", ['location general', 'food prices', 'food quality', 'food general',
-                                                                'ambience general', 'service general', 'restaurant prices',
-                                                                'drinks prices', 'restaurant miscellaneous', 'drinks quality',
-                                                                'drinks style_options', 'restaurant general', 'food style_options'])
+        default_aspects = CONFIG_DATA.get("aspect_categories", ['Restaurant#general', 'Service#general', 'Service#speed', 'Food#quality', 'Food#prices', 'Food#style_options', 'Ambience#general', 'Location#general', 'Drinks#quality', 'Drinks#prices'])
+
+        deepseek_triplets = []
+        qwen_triplets = []
+        text_val = ""
+        translation_val = ""
+        label_val = ""
+        aspects_val = default_aspects
 
         if DATA_FILE_TYPE == "json":
             item = data[data_idx]
-            # Check if item has been annotated
-            if 'label' in item:
-                # Item has been annotated (could be empty list or list with annotations)
-                label_value = json.dumps(
-                    item['label']) if item['label'] else ""
-            else:
-                # Item has not been annotated yet
-                label_value = ""
-
-            # Determine aspect categories for this example
-            aspects = item.get('aspect_category_list', default_aspects)
-            return {
-                "text": item.get('text', ''),
-                "label": label_value,
-                "translation": item.get('translation', ''),
-                "aspect_category_list": aspects
-            }
+            text_val = item.get("review_text", item.get("text", ""))
+            translation_val = item.get("translation", "")
+            lbl = item.get("label", [])
+            label_val = json.dumps(lbl, ensure_ascii=False) if isinstance(lbl, list) else str(lbl if lbl is not None else "")
+            aspects_val = item.get("aspect_category_list", default_aspects)
+            deepseek_triplets = item.get("deepseek_triplets", [])
+            qwen_triplets = item.get("qwen_triplets", [])
         else:
-            # CSV handling
             df = data
             row = df.iloc[data_idx]
             row_dict = row.to_dict()
-            # Replace NaN values with empty strings
-            for key, value in row_dict.items():
-                if pd.isna(value) or (isinstance(value, float) and (value == float('inf') or value == float('-inf'))):
+            for key, val in row_dict.items():
+                if pd.isna(val) or (isinstance(val, float) and val in [float("inf"), float("-inf")]):
                     row_dict[key] = ""
-            # Ensure translation field exists
-            if 'translation' not in row_dict:
-                row_dict['translation'] = ""
-            # Determine aspect categories for this example (CSV column or default)
-            raw_aspects = row_dict.get('aspect_category_list', None)
-            if raw_aspects:
-                aspects = raw_aspects
-            else:
-                aspects = default_aspects
-            row_dict['aspect_category_list'] = aspects
-            return row_dict
+            text_val = str(row_dict.get("review_text", row_dict.get("text", "")))
+            translation_val = str(row_dict.get("translation", ""))
+            label_val = str(row_dict.get("label", ""))
+            raw_asp = row_dict.get("aspect_category_list", None)
+            aspects_val = raw_asp if raw_asp else default_aspects
+
+            # Support user custom format: review_text, aspect_triplets, new_triplets, reasoning
+            if "aspect_triplets" in row_dict:
+                deepseek_triplets = parse_triplet_column(row_dict.get("aspect_triplets"), prefix="ds")
+            if "new_triplets" in row_dict:
+                qwen_triplets = parse_triplet_column(row_dict.get("new_triplets"), prefix="qw")
+            
+            # If sibling CSVs exist and columns were not in row
+            if not deepseek_triplets and not qwen_triplets:
+                base_dir = os.path.dirname(DATA_FILE_PATH)
+                ds_path = os.path.join(base_dir, "semeval_deepseek_labeled.csv") if base_dir else "semeval_deepseek_labeled.csv"
+                qw_path = os.path.join(base_dir, "semeval_qwen_labeled.csv") if base_dir else "semeval_qwen_labeled.csv"
+                
+                if os.path.exists(ds_path):
+                    ds_df = pd.read_csv(ds_path)
+                    match_ds = ds_df[ds_df["review_id"] == data_idx]
+                    for idx_ds, r in match_ds.iterrows():
+                        deepseek_triplets.append({
+                            "id": f"ds_{idx_ds}",
+                            "aspect_term": str(r.get("aspect_term", "")),
+                            "aspect_category": str(r.get("aspect_category", "")),
+                            "sentiment_polarity": str(r.get("sentiment_polarity", ""))
+                        })
+                if os.path.exists(qw_path):
+                    qw_df = pd.read_csv(qw_path)
+                    match_qw = qw_df[qw_df["review_id"] == data_idx]
+                    for idx_qw, r in match_qw.iterrows():
+                        qwen_triplets.append({
+                            "id": f"qw_{idx_qw}",
+                            "aspect_term": str(r.get("aspect_term", "")),
+                            "aspect_category": str(r.get("aspect_category", "")),
+                            "sentiment_polarity": str(r.get("sentiment_polarity", ""))
+                        })
+
+        agent_initial_reasoning = str(row_dict.get("reasoning", "")) if DATA_FILE_TYPE != "json" and "reasoning" in row_dict else ""
+        if not agent_initial_reasoning or agent_initial_reasoning in ["nan", "None", ""]:
+            agent_initial_reasoning = generate_mock_reasoning(text_val, deepseek_triplets, qwen_triplets)
+
+        return {
+            "id": data_idx,
+            "text": text_val,
+            "review_text": text_val,
+            "label": label_val,
+            "translation": translation_val,
+            "aspect_category_list": aspects_val,
+            "deepseek_triplets": deepseek_triplets,
+            "qwen_triplets": qwen_triplets,
+            "agent_initial_reasoning": agent_initial_reasoning
+        }
 
     except FileNotFoundError:
         raise HTTPException(
@@ -771,6 +888,9 @@ def get_most_similar_examples(input_text, examples, n):
     tokenized_query = tokenize(input_text_str)
 
     # Create BM25 model and get scores
+    if BM25Okapi is None:
+        return examples[:n]
+        
     bm25 = BM25Okapi(tokenized_examples)
     scores = bm25.get_scores(tokenized_query)
 
@@ -990,3 +1110,69 @@ async def startup_event():
 # Removed _get_cached_embedding function - BM25 doesn't need caching
 
 # Removed _cleanup_embedding_cache function - BM25 doesn't need caching
+
+
+
+
+
+@app.post("/review/{data_idx}/save")
+def save_review_triplets(data_idx: int, req: SaveTripletsRequest):
+    try:
+        data = load_data()
+        if data_idx >= len(data) or data_idx < 0:
+            raise HTTPException(status_code=404, detail="Index out of range")
+        
+        triplets_list = req.triplets
+        if DATA_FILE_TYPE == "json":
+            data[data_idx]["label"] = triplets_list
+            save_data(data)
+        else:
+            df = data
+            triplets_json = json.dumps(triplets_list, ensure_ascii=False)
+            df.at[data_idx, "label"] = triplets_json
+            save_data(df)
+            
+        return {"status": "success", "message": "İnceleme tripletleri başarıyla kaydedildi.", "next_index": data_idx + 1}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/agent/chat")
+def agent_chat(req: AgentChatRequest):
+    config = load_config()
+    openai_key = config.get("openai_key")
+    
+    if openai_key:
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=openai_key)
+            messages = [
+                {"role": "system", "content": f"Sen ABSA (Aspect-Based Sentiment Analysis) veri etiketleme asistanısın. Şu incelemeyi tartışıyorsunuz: \"{req.review_text}\". DeepSeek tripletleri: {req.deepseek_triplets}, Qwen tripletleri: {req.qwen_triplets}. Kullanıcıya mantıklı, akıl yürüterek açıklama yap."}
+            ]
+            for h in req.chat_history[-4:]:
+                role = "assistant" if h.get("sender") == "agent" else "user"
+                messages.append({"role": role, "content": h.get("text", "")})
+            messages.append({"role": "user", "content": req.user_message})
+            
+            comp = client.chat.completions.create(
+                model=config.get("llm_model", "gpt-4o"),
+                messages=messages,
+                temperature=0.7,
+                max_tokens=300
+            )
+            return {"reply": comp.choices[0].message.content}
+        except Exception as e:
+            print("OpenAI chat error:", e)
+
+    msg = req.user_message.lower()
+    reply = "Helper agent: "
+    if "deepseek" in msg or "model a" in msg:
+        reply += "DeepSeek modeli cümlenin yan cümleciklerini ('manzara şahane' ve 'servis rezalet') ayrı ayrı değerlendirmiş. Zıtlık bağlaçlarını iyi çözdüğü için DeepSeek tripletleri daha tutarlı."
+    elif "qwen" in msg or "model b" in msg:
+        reply += "Qwen modeli ana duyguya odaklandığı için bazen olumsuz yan etiketleri kaçırabiliyor. Qwen çıktısında doğru olanları seçip eksikleri orta formdan ekleyebilirsin."
+    elif "neden" in msg or "niye" in msg or "hangisi" in msg:
+        reply += "Metinde zıtlık bağlacı olduğu için iki model farklı sonuç üretmiş. Benim önerim hem yeşil (positive) hem kırmızı (negative) etiketleri seçerek tam kapsamlı etiketleme yapman."
+    else:
+        reply += f"\"{req.user_message}\" mesajını aldım. Hem DeepSeek hem Qwen çıktısındaki doğru tripletleri işaretleyip sağ alttaki \"press for next review\" butonuna basarak kaydedebilirsin."
+        
+    return {"reply": reply}

@@ -25,4 +25,4 @@ Sentiment elements: [('aspect term': 'location', 'aspect category': 'location ge
 Text: The atmosphere was romantic but the food was disappointing.
 Sentiment elements: [('aspect term': 'atmosphere', 'aspect category': 'ambience general', 'sentiment polarity': 'positive', 'opinion term': 'romantic'), ('aspect term': 'food', 'aspect category': 'food quality', 'sentiment polarity': 'negative', 'opinion term': 'disappointing')]
 Text: The cocktails were creative and the bartenders were friendly.
-Sentiment elements: 
+Sentiment elements:

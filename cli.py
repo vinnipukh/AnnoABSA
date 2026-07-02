@@ -16,6 +16,8 @@ import signal
 import atexit
 from typing import Dict, Any, List
 from typing import List, Dict, Any
+import ast
+import pandas as pd
 
 # Global variable to track backend process
 backend_process = None
@@ -363,6 +365,35 @@ def is_port_in_use(host: str, port: int) -> bool:
             return True
 
 
+def std_triplets_to_label(raw_triplet_str: str) -> list:
+    """Convert STD format triplet string to internal label list of dicts.
+
+    STD format: Python list-literal string with single quotes, e.g.
+    \"[['NULL', 'course general', 'positive']]\"
+    Returns: list of dicts with keys aspect_term, aspect_category,
+             sentiment_polarity, opinion_term (empty string).
+    Empty or unparseable input returns [] and logs a warning.
+    """
+    if raw_triplet_str is None or str(raw_triplet_str).strip() in ["", "nan", "None", "[]"]:
+        return []
+    try:
+        parsed = ast.literal_eval(str(raw_triplet_str))
+        res = []
+        if isinstance(parsed, list):
+            for item in parsed:
+                if isinstance(item, (list, tuple)) and len(item) >= 3:
+                    res.append({
+                        "aspect_term": str(item[0]) if item[0] else "NULL",
+                        "aspect_category": str(item[1]),
+                        "sentiment_polarity": str(item[2]).lower(),
+                        "opinion_term": ""
+                    })
+        return res
+    except Exception as e:
+        print(f"Warning: Could not parse STD triplet string: {e}")
+        return []
+
+
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -544,6 +575,18 @@ Examples:
         help="Maximum number of few-shot examples to include in LLM prompts (default: 10)"
     )
 
+    parser.add_argument(
+        "--format",
+        choices=["std"],
+        help="Input file format. Use 'std' for two-column (review,triplet) STD format CSV"
+    )
+
+    parser.add_argument(
+        "--export-std",
+        metavar="OUTPUT_PATH",
+        help="Export annotated data to STD format CSV at the given path, then exit"
+    )
+
     # Server control arguments
     parser.add_argument(
         "--backend",
@@ -594,6 +637,73 @@ Examples:
     print(f"📂 Using {file_extension[1:].upper()} file: {args.data_path}")
     if file_extension == '.csv':
         print("💡 Note: CSV file will be read/written with UTF-8 encoding")
+
+    # Handle --export-std: export to STD format and exit
+    if args.export_std:
+        try:
+            export_df = pd.read_csv(args.data_path, encoding='utf-8')
+        except Exception as e:
+            print(f"❌ Error reading data file for export: {e}")
+            sys.exit(1)
+
+        export_rows = []
+        for _, row in export_df.iterrows():
+            review_text = row.get("review_text", row.get("text", ""))
+            label_str = row.get("label", "[]")
+            if pd.isna(label_str) or str(label_str).strip() in ("", "nan"):
+                label_str = "[]"
+            try:
+                annotations = json.loads(str(label_str))
+            except (json.JSONDecodeError, TypeError):
+                annotations = []
+
+            triplets = []
+            for ann in annotations:
+                at = ann.get("aspect_term", "NULL")
+                ac = ann.get("aspect_category", "")
+                sp = ann.get("sentiment_polarity", "").lower()
+                triplets.append([at, ac, sp])
+
+            export_rows.append({"review": review_text, "triplet": repr(triplets)})
+
+        export_out = pd.DataFrame(export_rows)
+        export_out.to_csv(args.export_std, index=False, encoding='utf-8')
+        print(f"✅ Exported to STD format: {args.export_std}")
+        sys.exit(0)
+
+    # Handle --format std: convert STD to internal format before proceeding
+    if args.format == "std":
+        try:
+            std_df = pd.read_csv(args.data_path, encoding='utf-8')
+        except Exception as e:
+            print(f"❌ Error reading STD file: {e}")
+            sys.exit(1)
+
+        # Validate columns
+        required_cols = {"review", "triplet"}
+        if not required_cols.issubset(std_df.columns):
+            print(f"❌ Error: STD format CSV must have 'review' and 'triplet' columns. Found: {list(std_df.columns)}")
+            sys.exit(1)
+
+        converted_rows = []
+        for _, row in std_df.iterrows():
+            review_text = row["review"]
+            triplet_str = str(row["triplet"]) if pd.notna(row.get("triplet")) else "[]"
+            label = std_triplets_to_label(triplet_str)
+            converted_rows.append({
+                "review_text": review_text,
+                "label": json.dumps(label, ensure_ascii=False)
+            })
+
+        base, _ = os.path.splitext(args.data_path)
+        working_path = f"{base}_annoabsa.csv"
+        converted_df = pd.DataFrame(converted_rows)
+        converted_df.to_csv(working_path, index=False, encoding='utf-8')
+        print(f"✅ Converted STD format -> internal format: {working_path}")
+
+        # Override data_path to point at the working copy
+        args.data_path = working_path
+        print(f"📂 Using internal format file: {args.data_path}")
 
     # Initialize configuration
     config = ABSAAnnotatorConfig(args.data_path)
@@ -679,3 +789,6 @@ Examples:
 
 if __name__ == "__main__":
     main()
+
+
+

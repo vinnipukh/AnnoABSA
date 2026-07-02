@@ -19,3 +19,5 @@
 \midrule
 \textbf{AVG} & 0.858 & 0.862 & 1.305 & 1.213 & 1.741 & 1.632 \\
 \bottomrule
+
+

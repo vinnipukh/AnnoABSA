@@ -23,3 +23,6 @@ for seed in seeds:
             ]
             print("Running:", " ".join(cmd))
             subprocess.run(cmd, check=True)
+
+
+
