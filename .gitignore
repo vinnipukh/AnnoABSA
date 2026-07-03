@@ -1,3 +1,51 @@
+# ── Python ────────────────────────────────────
 __pycache__/
-guidelines.pdf
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+*.whl
+
+# ── Virtual environments ──────────────────────
+.venv/
+venv/
+env/
+.env/
+
+# ── Node / Frontend ──────────────────────────
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+
+# ── Jupyter notebooks ────────────────────────
+.ipynb_checkpoints/
+
+# ── IDE / Editor ─────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.orig
+
+# ── OS junk ──────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── Runtime / generated artifacts ────────────
 temp_absa_config.json
+temp_absa_*
+uploads/
+evaluation/predictions/
+evaluation/predictions_random/
+evaluation/performance_plot.pdf
+evaluation/performance_latex/
+
+# ── Agent / tooling ──────────────────────────
+.agentbridge/
+guidelines.pdf

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { TripletItem, ReviewComparisonData, ChatMessage, Settings } from './types';
 import { ModelTripletColumn } from './components/ModelTripletColumn';
 import { ManualInputForm } from './components/ManualInputForm';
@@ -91,10 +91,32 @@ export default function App() {
   const [mode, setMode] = useState<'compare' | 'manual'>('compare');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const [showChat, setShowChat] = useState(true);
+  const [showFloatingChat, setShowFloatingChat] = useState(true);
   const [saveToast, setSaveToast] = useState<string | null>(null);
 
   const backendUrl = import.meta.env?.VITE_BACKEND_URL || 'http://localhost:8000';
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch(`${backendUrl}/upload-data`, { method: 'POST', body: formData });
+      if (!res.ok) throw new Error('upload failed');
+      const data = await res.json();
+      if (data.total_count) setTotalCount(data.total_count);
+      setCurrentIndex(0);
+      setSaveToast(`✅ ${data.message}`);
+      setTimeout(() => setSaveToast(null), 3000);
+    } catch (_) {
+      setSaveToast('❌ Yükleme başarısız — backend çalışıyor mu?');
+      setTimeout(() => setSaveToast(null), 3000);
+    }
+    // Reset so the same file can be chosen again
+    e.target.value = '';
+  };
 
   const loadReviewRow = async (index: number) => {
     try {
@@ -217,12 +239,21 @@ export default function App() {
               }`}>Manuel</button>
           </div>
           {/* Chat toggle */}
-          <button onClick={() => setShowChat(p => !p)}
+          <button onClick={() => setShowFloatingChat(p => !p)}
             className={`p-1.5 rounded-lg transition-all border ${
-              showChat ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' : 'bg-slate-800 text-slate-500 border-slate-700 hover:text-slate-300'
-            }`} title={showChat ? 'Sohbeti Gizle' : 'Sohbeti Göster'}>
+              showFloatingChat ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' : 'bg-slate-800 text-slate-500 border-slate-700 hover:text-slate-300'
+            }`} title={showFloatingChat ? 'Sohbeti Kapat' : 'Sohbeti Aç'}>
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+          </button>
+          {/* File upload */}
+          <input ref={fileInputRef} type="file" accept=".csv,.json" onChange={handleFileUpload} className="hidden" />
+          <button onClick={() => fileInputRef.current?.click()}
+            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors border border-slate-700"
+            title="CSV/JSON Yükle">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
           </button>
           {/* Nav */}
@@ -238,8 +269,8 @@ export default function App() {
       </header>
 
       {/* Main workspace: natural flex, no fixed percentage splits */}
-      <main className="flex-1 p-3 flex flex-col gap-2 max-w-[1700px] w-full mx-auto h-[calc(100vh-3rem)] overflow-hidden">
-        {/* Top: annotation workspace */}
+      <main className="flex-1 p-3 flex flex-col max-w-[1700px] w-full mx-auto h-[calc(100vh-3rem)] overflow-hidden">
+        {/* Annotation workspace (takes all available space) */}
         <section className="flex-1 min-h-0">
           {mode === 'compare' ? (
             <div className="h-full grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -274,19 +305,17 @@ export default function App() {
             </div>
           )}
         </section>
-
-        {/* Bottom: chat panel (when visible) */}
-        {showChat && (
-          <div className="h-48 min-h-[120px] flex-shrink-0">
-            <HelperAgentChatbox
-              initialReasoning={currentData.agent_initial_reasoning}
-              messages={chatMessages}
-              onSendMessage={handleSendMessage}
-              isLoading={isChatLoading}
-            />
-          </div>
-        )}
       </main>
+
+      {/* Floating chat widget */}
+      {showFloatingChat && (
+        <HelperAgentChatbox
+          initialReasoning={currentData.agent_initial_reasoning}
+          messages={chatMessages}
+          onSendMessage={handleSendMessage}
+          isLoading={isChatLoading}
+        />
+      )}
 
       {/* Bottom bar: save button + status */}
       <footer className="h-10 bg-slate-900/90 border-t border-slate-800 px-4 flex items-center justify-between flex-shrink-0 z-20">

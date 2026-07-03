@@ -1,4 +1,5 @@
 import re
+import time
 import numpy as np
 try:
     from rank_bm25 import BM25Okapi
@@ -6,6 +7,7 @@ except ImportError:
     BM25Okapi = None
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import UploadFile, File
 from pydantic import BaseModel
 import pandas as pd
 import json
@@ -1447,6 +1449,47 @@ def get_avg_annotation_time():
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error calculating average annotation time: {str(e)}")
+
+
+import tempfile
+import shutil
+
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+@app.post("/upload-data")
+async def upload_data(file: UploadFile = File(...)):
+    """Upload a CSV or JSON data file to use for annotation."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ('.csv', '.json'):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{ext}'. Upload .csv or .json files only."
+        )
+
+    # Save to uploads directory with a safe name
+    safe_name = f"uploaded_{int(time.time())}{ext}"
+    dest = os.path.join(UPLOAD_DIR, safe_name)
+
+    with open(dest, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    # Activate the uploaded file
+    set_data_file(dest)
+
+    # Load and return count
+    try:
+        data = load_data()
+        count = len(data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading uploaded file: {e}")
+
+    print(f"📤 Uploaded data file: {dest} ({count} rows)")
+    return {"message": f"Loaded {file.filename} ({count} satır)", "total_count": count, "file_path": dest}
 
 
 @app.on_event("startup")
