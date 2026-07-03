@@ -210,4 +210,4 @@ walkthrough (you need to know which endpoint you're actually testing in step 5).
 2. A plan in the `[Step] → verify: [check]` format.
 3. Wait for my go-ahead before implementing.
 4. Full file contents or clearly marked diffs for anything you change — and for Task C, the
-   actual test output/values, not a summary claiming it passed.
+actual test output/values, not a summary claiming it passed./

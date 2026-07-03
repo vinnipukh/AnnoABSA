@@ -902,13 +902,30 @@ Examples:
     if args.n_few_shot:
         config.set_n_few_shot(args.n_few_shot)
 
-    # LLM provider: use explicit flag, or derive from openai_key presence
+    # LLM provider: use explicit flag, or derive from configured keys
+    # NOTE: Must match _derive_provider() in main.py — cannot import to avoid
+    # import-time side effects (FastAPI app creation, env-var reads).
+    # See Task 4 precedent for the template-constant duplication.
     if args.llm_provider:
         config.set_llm_provider(args.llm_provider)
-    elif args.openai_key:
-        config.set_llm_provider("openai")
     else:
-        config.set_llm_provider("ollama")
+        configured = [
+            name for name, flag in [
+                ("openai", args.openai_key),
+                ("anthropic", args.anthropic_key),
+                ("vllm", args.vllm_url),
+            ] if flag
+        ]
+        if len(configured) > 1:
+            print(
+                f"❌ Error: multiple providers configured ({', '.join(configured)}) "
+                f"but --llm-provider not specified. Pick one explicitly."
+            )
+            sys.exit(1)
+        elif len(configured) == 1:
+            config.set_llm_provider(configured[0])
+        else:
+            config.set_llm_provider("ollama")
 
     if args.llm_model:
         config.set_llm_model(args.llm_model)

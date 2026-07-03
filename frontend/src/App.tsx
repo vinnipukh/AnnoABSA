@@ -119,17 +119,31 @@ export default function App() {
   };
 
   const loadReviewRow = async (index: number) => {
-    try {
-      const res = await fetch(`${backendUrl}/data/${index}`);
-      if (!res.ok) throw new Error("API Offline");
-      setCurrentData(await res.json());
-    } catch (e) {
-      setCurrentData(FALLBACK_DATA[index % FALLBACK_DATA.length]);
-    }
     setSelectedModelAIds(new Set());
     setSelectedModelBIds(new Set());
     setManualTriplets([]);
     setChatMessages([]);
+    try {
+      const res = await fetch(`${backendUrl}/data/${index}`);
+      if (!res.ok) throw new Error("API Offline");
+      const data = await res.json();
+      setCurrentData(data);
+      // Restore previously saved triplets from the label field
+      // label is a JSON string from the API (TripletItem[] from FALLBACK_DATA)
+      if (data.label) {
+        let parsed: unknown;
+        if (typeof data.label === 'string') {
+          try { parsed = JSON.parse(data.label); } catch { parsed = null; }
+        } else {
+          parsed = data.label;
+        }
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setManualTriplets(parsed as TripletItem[]);
+        }
+      }
+    } catch (e) {
+      setCurrentData(FALLBACK_DATA[index % FALLBACK_DATA.length]);
+    }
   };
 
   useEffect(() => {

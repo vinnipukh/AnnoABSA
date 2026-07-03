@@ -1271,6 +1271,42 @@ PROVIDER_REGISTRY = {
 }
 
 
+def _derive_provider(config: dict) -> str:
+    """Derive the LLM provider from a config dict.
+
+    Priority:
+    1. Explicit 'llm_provider' key → use it directly.
+    2. Exactly one of (openai_key, anthropic_key, vllm_url) is set → derive to that provider.
+    3. Multiple of the above are set but no explicit 'llm_provider' → raise ValueError.
+    4. None are set → fall back to 'ollama'.
+
+    NOTE: cli.py has an inline copy of this logic that MUST be kept in sync
+    (cannot import from main.py without triggering import-time side effects,
+    same as the template constants in Task 4).
+    """
+    explicit = config.get('llm_provider')
+    if explicit:
+        return explicit
+
+    configured = [
+        name for name, key in [
+            ("openai", "openai_key"),
+            ("anthropic", "anthropic_key"),
+            ("vllm", "vllm_url"),
+        ] if config.get(key)
+    ]
+
+    if len(configured) > 1:
+        raise ValueError(
+            f"Multiple providers configured ({', '.join(configured)}) "
+            f"but no --llm-provider specified. Pick one explicitly."
+        )
+    elif len(configured) == 1:
+        return configured[0]
+    else:
+        return "ollama"
+
+
 def get_provider(provider_name: str, config: dict):
     """Factory: instantiate the right provider adapter for the given name.
 
@@ -1345,11 +1381,10 @@ def get_ai_prediction(data_idx: int):
         examples = [ex for ex in examples if ex['text'] != text]
 
         # Dispatch to the configured LLM provider via the port/adapter pattern
-        provider_name = CONFIG_DATA.get('llm_provider', 'ollama')
-
-        # Backward compat: if no explicit provider but openai_key is set, prefer OpenAI
-        if not CONFIG_DATA.get('llm_provider') and config.get('openai_key'):
-            provider_name = 'openai'
+        try:
+            provider_name = _derive_provider(CONFIG_DATA)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
         # Validate provider configuration
         if provider_name == 'openai' and not config.get('openai_key'):
@@ -1553,10 +1588,8 @@ def agent_chat(req: AgentChatRequest):
     model_a_name = config.get("compare_model_a_name", "Model A")
     model_b_name = config.get("compare_model_b_name", "Model B")
 
-    # Determine provider (same derivation as get_ai_prediction)
-    provider_name = CONFIG_DATA.get('llm_provider', 'ollama')
-    if not CONFIG_DATA.get('llm_provider') and config.get('openai_key'):
-        provider_name = 'openai'
+    # Determine provider (same derivation as get_ai_prediction, via shared helper)
+    provider_name = None
 
     # Build chat messages
     chat_template = CONFIG_DATA.get('helper_agent_prompt_template', DEFAULT_CHAT_TEMPLATE)
@@ -1577,6 +1610,7 @@ def agent_chat(req: AgentChatRequest):
 
     # Dispatch to configured provider
     try:
+        provider_name = _derive_provider(CONFIG_DATA)
         if provider_name == 'openai' and not config.get('openai_key'):
             raise ValueError("OpenAI provider selected but no API key configured. Use --openai-key.")
         if provider_name == 'anthropic' and not config.get('anthropic_key'):
@@ -1593,7 +1627,7 @@ def agent_chat(req: AgentChatRequest):
         )
         return {"reply": reply}
     except Exception as e:
-        print(f"Provider chat error ({provider_name}): {e}")
+        print(f"Provider chat error: {e}")
 
     # Fallback: hardcoded Turkish rule-based responses (backward compat when no provider configured)
     msg = req.user_message.lower()
