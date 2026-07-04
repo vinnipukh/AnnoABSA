@@ -67,14 +67,30 @@ AUTO_POSITIONS = CONFIG_DATA.get('auto_positions', False)
 
 
 def set_data_file(file_path: str):
-    """Set the data file path and determine file type."""
+    """Set the data file path and determine the file type from its extension.
+
+    Updates the global DATA_FILE_PATH and DATA_FILE_TYPE.
+    Called:
+    - From cli.py at startup (via config-based file selection)
+    - From upload_data endpoint when a user uploads a file through the UI
+
+    Args:
+        file_path: Absolute or relative path to a CSV or JSON file.
+    """
     global DATA_FILE_PATH, DATA_FILE_TYPE
     DATA_FILE_PATH = file_path
     DATA_FILE_TYPE = "json" if file_path.endswith('.json') else "csv"
 
 
 def set_config_file(config_path: str):
-    """Set the config file path."""
+    """Set the path to the JSON configuration file.
+
+    Updates the global CONFIG_PATH. The config is loaded on the next
+    call to load_config() or on the next request that reads configuration.
+
+    Args:
+        config_path: Path to a .json config file.
+    """
     global CONFIG_PATH
     CONFIG_PATH = config_path
 
@@ -159,20 +175,24 @@ app.add_middleware(
 
 # Datenmodell für POST Requests
 class Item(BaseModel):
+    """Legacy request model for POST /data/{idx}."""
     name: str
     value: int
 
-# Datenmodell für Annotations
-
 
 class AnnotationData(BaseModel):
+    """Legacy request model for POST /annotations/{idx}."""
     name: str
     value: list
 
+
 class SaveTripletsRequest(BaseModel):
+    """Request model for the primary save endpoint POST /review/{idx}/save."""
     triplets: list
 
+
 class AgentChatRequest(BaseModel):
+    """Request model for the Helper Agent chat endpoint POST /agent/chat."""
     review_text: str
     model_a_triplets: list = []
     model_b_triplets: list = []
@@ -185,6 +205,12 @@ class AgentChatRequest(BaseModel):
 
 @app.get("/settings")
 def get_settings():
+    """Return annotation config + metadata (acts as de facto health check).
+
+    Returns sentiment elements, categories, polarities, boolean flags,
+    current_index, max_number_of_idxs, and session_id.
+    Called by the frontend on every page load.
+    """
     settings = {
         "sentiment elements": CONFIG_DATA.get("sentiment_elements", ["aspect_term", "aspect_category", "sentiment_polarity", "opinion_term"]),
         "total_count": get_total_count(),
@@ -219,6 +245,25 @@ def get_settings():
 import ast
 
 def parse_triplet_column(raw_val, prefix="t"):
+    """Parse a Python list-literal string into a list of triplet dicts.
+
+    Handles multiple input formats:
+    - STD tuples: ``[('term', 'CATEGORY', 'polarity'), ...]``
+    - STD lists: ``[['term', 'CATEGORY', 'polarity'], ...]``
+    - Dict format: ``[{'aspect_term': ..., 'aspect_category': ..., 'sentiment_polarity': ...}, ...]``
+    - Empty values: ``None``, ``"nan"``, ``"None"``, ``"[]"``, ``""``
+
+    Used by:
+    - get_data() to parse inline comparison columns (aspect_triplets / new_triplets)
+    - _load_comparison_csv() to parse STD-format comparison CSVs
+
+    Args:
+        raw_val: Raw cell value from a CSV (string, NaN, or None).
+        prefix: Prefix for generated triplet IDs (e.g. 'ma' for Model A, 'mb' for Model B).
+
+    Returns:
+        List of dicts with keys: id, aspect_term, aspect_category, sentiment_polarity.
+    """
     if raw_val is None or str(raw_val).strip() in ["", "nan", "None", "[]"]:
         return []
     try:
@@ -252,6 +297,23 @@ def parse_triplet_column(raw_val, prefix="t"):
         return []
 
 def generate_mock_reasoning(text: str, model_a_name: str, model_b_name: str, model_a_list: list, model_b_list: list) -> str:
+    """Generate a Turkish-language reasoning paragraph comparing two model outputs.
+
+    Produces a human-readable analysis noting common aspects, model-specific
+    differences, and a recommendation. Used as fallback when the CSV doesn't
+    have a pre-computed 'reasoning' column, or when the backend's LLM-based
+    helper agent isn't available.
+
+    Args:
+        text: The review text being analyzed.
+        model_a_name: Display name for Model A (e.g. 'Model A' or 'GPT-4o').
+        model_b_name: Display name for Model B.
+        model_a_list: List of triplet dicts from Model A (keys: aspect_term, ...).
+        model_b_list: List of triplet dicts from Model B.
+
+    Returns:
+        A string containing the Turkish analysis paragraph.
+    """
     if not text:
         return "Helper agent: İnceleme seçilmedi."
     model_a_aspects = [t.get("aspect_term", "") for t in model_a_list if t.get("aspect_term")]
@@ -325,6 +387,20 @@ def _load_comparison_csv(csv_path: str, data_idx: int, review_text: str, prefix:
 
 @app.get("/data/{data_idx}")
 def get_data(data_idx: int):
+    """Return a single row's review text, label, and model comparison data.
+
+    This is the primary data endpoint — the frontend calls it whenever the
+    user navigates to a row. Handles JSON and CSV formats. Supports inline
+    comparison columns and external comparison CSVs.
+
+    Args:
+        data_idx: 0-based row index.
+
+    Returns:
+        dict with keys: id, text, review_text, label, translation,
+        aspect_category_list, model_a_triplets, model_b_triplets,
+        model_a_name, model_b_name, agent_initial_reasoning.
+    """
     try:
         data = load_data()
         if data_idx >= len(data) or data_idx < 0:
@@ -404,6 +480,13 @@ def get_data(data_idx: int):
 
 
 def get_total_count():
+    """Return the total number of data items (reviews) in the current dataset.
+
+    Returns:
+        Total row/item count (int).
+
+    Raises HTTPException (500) on read errors, (404) if file missing.
+    """
     try:
         data = load_data()
         return len(data)
@@ -415,6 +498,19 @@ def get_total_count():
 
 
 def get_current_index():
+    """Find the index of the first unannotated data item.
+
+    For JSON: returns the first entry without a 'label' key.
+    For CSV: returns the first row whose label column is empty/NaN.
+    If all items are annotated, returns len(data) (the count, not a valid index).
+
+    Used by:
+    - get_settings() to report current_index to the frontend
+    - The frontend to decide which row to display on initial load
+
+    Returns:
+        int: Index of the first unannotated item, or total count if all done.
+    """
     try:
         data = load_data()
         if DATA_FILE_TYPE == "json":
@@ -437,6 +533,13 @@ def get_current_index():
 
 
 def max_number_of_idxs():
+    """Return the total number of data items (alias for get_total_count).
+
+    Returns the maximum valid index + 1. Used by the frontend for pagination.
+
+    Returns:
+        int: Total number of data items.
+    """
     try:
         data = load_data()
         return len(data)
@@ -451,7 +554,12 @@ def max_number_of_idxs():
 
 @app.post("/data/{data_idx}")
 def post_data(data_idx: int, item: Item):
-    # add value to row label
+    """Save a single integer value to the label column (legacy endpoint).
+
+    DEPRECATED: This endpoint hardcodes a path to 'annotations.csv' and only
+    accepts an integer value. The frontend no longer calls this —
+    use POST /review/{data_idx}/save instead.
+    """
     try:
         df = pd.read_csv("annotations.csv")
         if data_idx >= len(df) or data_idx < 0:
@@ -470,6 +578,12 @@ def post_data(data_idx: int, item: Item):
 
 @app.post("/annotations/{data_idx}")
 def post_annotations(data_idx: int, annotation_data: AnnotationData):
+    """Save annotations for a given row (legacy endpoint, no frontend callers).
+
+    DEPRECATED: The frontend now uses POST /review/{data_idx}/save exclusively.
+    This endpoint has no callers anywhere in the frontend codebase but is kept
+    for backward compatibility.
+    """
     try:
         data = load_data()
         if data_idx >= len(data) or data_idx < 0:
@@ -700,7 +814,12 @@ def auto_add_missing_positions():
 
 @app.post("/auto-add-positions")
 def manual_auto_add_positions():
-    """Manually trigger the auto-addition of missing position data."""
+    """HTTP-triggerable endpoint to auto-fill missing position data.
+
+    Calls auto_add_missing_positions() which scans the dataset and adds
+    at_start/at_end/ot_start/ot_end fields for any phrases missing them.
+    Only fills positions when AUTO_POSITIONS is True.
+    """
     try:
         auto_add_missing_positions()
         return {"message": "Position data auto-addition completed successfully"}
@@ -798,7 +917,20 @@ def predict_openai(text, considered_sentiment_elements, examples, aspect_categor
 
 
 def get_most_similar_examples(input_text, examples, n):
-    """Return up to n most similar example annotations based on input_text using BM25"""
+    """Return up to n most similar examples via BM25 retrieval.
+
+    Tokenizes with lowercase \\w+ regex (no Turkish stemming).
+    Returns top-n sorted by BM25 similarity descending.
+    Returns all if n >= len(examples).
+
+    Args:
+        input_text: The text to find similar examples for.
+        examples: List of dicts with {'text': ..., 'label': ...}.
+        n: Max examples to return.
+
+    Returns:
+        List of up to n examples, most similar first.
+    """
 
     # If no examples available, return empty list
     if not examples:
@@ -830,6 +962,7 @@ def get_most_similar_examples(input_text, examples, n):
 
     # Tokenize texts for BM25
     def tokenize(text):
+        """Simple tokenizer: lowercase, split on word boundaries."""
         # Simple tokenization: lowercase and split on whitespace/punctuation
         return re.findall(r'\b\w+\b', text.lower())
 
@@ -855,6 +988,21 @@ def get_most_similar_examples(input_text, examples, n):
 
 
 def find_valid_phrases_list(text, max_tokens_in_phrase=None):
+    """Enumerate all valid sub-phrases from text up to a max token count.
+
+    Splits at punctuation/whitespace boundaries, enumerates all contiguous
+    sub-phrases. Filters out those starting/ending with non-word characters.
+
+    Used by build_absa_models() to create allowed aspect/opinion terms
+    for Pydantic enum generation (structured LLM output).
+
+    Args:
+        text: The review text.
+        max_tokens_in_phrase: Max word count (None = unlimited).
+
+    Returns:
+        List of valid phrase strings.
+    """
     phrases = []
     # identify split positions based on punctuation and spaces
     split_positions = [0]
@@ -1002,19 +1150,31 @@ def build_absa_models(text, considered_sentiment_elements, polarities, aspect_ca
     )
 
     class Aspects(BaseModel):
+        """Container for a list of SentimentElement predictions."""
         aspects: list[SentimentElement]
 
     return Aspects, field_types, {"AspectEnum": AspectEnum, "OpinionEnum": OpinionEnum, "PolarityEnum": PolarityEnum, "CategoryEnum": CategoryEnum}
 
 
 class OllamaProvider:
-    """LLM provider adapter for Ollama (local)."""
+    """LLM provider adapter for Ollama (local inference).
+
+    Uses the ollama Python library for both structured ABSA prediction
+    (via Pydantic JSON schema) and general chat. Requires a running
+    Ollama server (default: localhost:11434).
+    """
 
     def __init__(self, config: dict):
+        """Initialize with the application config dict (CONFIG_DATA)."""
         self.config = config
 
     def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None):
-        """Predict ABSA triplets via Ollama."""
+        """Predict ABSA triplets via Ollama's generate endpoint with structured JSON output.
+
+        Uses Pydantic model_json_schema() for the format parameter,
+        ensuring the model returns valid structured data conforming to
+        the expected aspect schema.
+        """
         from ollama import generate
         import json
 
@@ -1042,7 +1202,20 @@ class OllamaProvider:
         return json.loads(response.response), few_shot_examples
 
     def chat(self, messages, model, temperature=0.7, max_tokens=300):
-        """Send a chat message via Ollama."""
+        """Send a chat message via Ollama's chat endpoint.
+
+        Uses ollama.chat() for general-purpose conversation (not structured output).
+        Used by the Helper Agent panel (POST /agent/chat).
+
+        Args:
+            messages: List of dicts with 'role' and 'content' keys.
+            model: Ollama model name (e.g. 'gemma3:4b').
+            temperature: Sampling temperature (default 0.7).
+            max_tokens: Max tokens in response (default 300).
+
+        Returns:
+            str: The model's response text.
+        """
         from ollama import chat as ollama_chat
         response = ollama_chat(
             model=model,
@@ -1053,13 +1226,25 @@ class OllamaProvider:
 
 
 class OpenAIProvider:
-    """LLM provider adapter for OpenAI-compatible APIs."""
+    """LLM provider adapter for OpenAI-compatible APIs.
+
+    Uses the official openai Python library with structured output via
+    beta.chat.completions.parse (Pydantic response_format). Also supports
+    standard chat completions for the Helper Agent panel.
+
+    Requires 'openai_key' in the config dict.
+    """
 
     def __init__(self, config: dict):
+        """Initialize with the application config dict (CONFIG_DATA)."""
         self.config = config
 
     def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None):
-        """Predict ABSA triplets via OpenAI structured output."""
+        """Predict ABSA triplets via OpenAI structured output (beta.parse).
+
+        Uses client.beta.chat.completions.parse with a Pydantic response_format
+        to get validated, structured triplet data directly from the API.
+        """
         from openai import OpenAI
         import json
 
@@ -1106,7 +1291,20 @@ class OpenAIProvider:
             return {"aspects": []}, few_shot_examples
 
     def chat(self, messages, model, temperature=0.7, max_tokens=300):
-        """Send a chat message via OpenAI."""
+        """Send a chat message via OpenAI chat completions.
+
+        Uses client.chat.completions.create for general conversation.
+        Used by the Helper Agent panel.
+
+        Args:
+            messages: List of dicts with 'role' and 'content'.
+            model: OpenAI model name (e.g. 'gpt-4o-2024-08-06').
+            temperature: Sampling temperature (default 0.7).
+            max_tokens: Max response tokens (default 300).
+
+        Returns:
+            str: The model's response text.
+        """
         from openai import OpenAI
         openai_key = self.config.get("openai_key")
         if not openai_key:
@@ -1122,13 +1320,26 @@ class OpenAIProvider:
 
 
 class AnthropicProvider:
-    """LLM provider adapter for Anthropic."""
+    """LLM provider adapter for Anthropic (Claude).
+
+    Uses the anthropic Python library with messages.create for both
+    ABSA prediction (JSON extraction from response text) and general
+    chat (OpenAI→Anthropic message format conversion).
+
+    Requires 'anthropic_key' in the config dict.
+    """
 
     def __init__(self, config: dict):
+        """Initialize with the application config dict (CONFIG_DATA)."""
         self.config = config
 
     def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None):
-        """Predict ABSA triplets via Anthropic."""
+        """Predict ABSA triplets via Anthropic Claude.
+
+        Sends the prompt as a user message, then parses JSON from the
+        response content. Unlike OpenAI's structured output, this requires
+        manual JSON extraction from the response text.
+        """
         from anthropic import Anthropic
         import json
 
@@ -1169,7 +1380,21 @@ class AnthropicProvider:
             return {"aspects": []}, few_shot_examples
 
     def chat(self, messages, model, temperature=0.7, max_tokens=300):
-        """Send a chat message via Anthropic."""
+        """Send a chat message via Anthropic Claude.
+
+        Converts OpenAI-style message format (system + user/assistant roles)
+        to Anthropic's format (system string + messages list without system role).
+        Used by the Helper Agent panel.
+
+        Args:
+            messages: OpenAI-format message list with 'role' and 'content'.
+            model: Anthropic model (e.g. 'claude-sonnet-4-20250514').
+            temperature: Sampling temperature (default 0.7).
+            max_tokens: Max response tokens (default 300).
+
+        Returns:
+            str: The model's response text.
+        """
         from anthropic import Anthropic
         anthropic_key = self.config.get("anthropic_key")
         if not anthropic_key:
@@ -1196,13 +1421,26 @@ class AnthropicProvider:
 
 
 class VLLMProvider:
-    """LLM provider adapter for vLLM (OpenAI-compatible)."""
+    """LLM provider adapter for vLLM (OpenAI-compatible API).
+
+    Uses the openai Python library with a custom base_url pointing to the
+    vLLM server. Since vLLM does not support beta.chat.completions.parse
+    (structured output), prediction uses standard completions + manual JSON parse.
+
+    Requires 'vllm_url' in the config dict (e.g. 'http://localhost:8001/v1').
+    """
 
     def __init__(self, config: dict):
+        """Initialize with the application config dict (CONFIG_DATA)."""
         self.config = config
 
     def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None):
-        """Predict ABSA triplets via vLLM (OpenAI-compatible API)."""
+        """Predict ABSA triplets via vLLM (standard OpenAI completion + manual JSON parse).
+
+        vLLM does not support the structured output API (beta.parse), so this
+        uses a standard chat completion and attempts to parse JSON from the
+        response text.
+        """
         from openai import OpenAI
         import json
 
@@ -1247,7 +1485,20 @@ class VLLMProvider:
             return {"aspects": []}, few_shot_examples
 
     def chat(self, messages, model, temperature=0.7, max_tokens=300):
-        """Send a chat message via vLLM (OpenAI-compatible API)."""
+        """Send a chat message via vLLM (OpenAI-compatible API).
+
+        Uses the openai Python library with the vLLM base_url for general
+        conversation. Used by the Helper Agent panel.
+
+        Args:
+            messages: List of dicts with 'role' and 'content'.
+            model: vLLM model name.
+            temperature: Sampling temperature (default 0.7).
+            max_tokens: Max response tokens (default 300).
+
+        Returns:
+            str: The model's response text.
+        """
         from openai import OpenAI
         vllm_url = self.config.get("vllm_url")
         if not vllm_url:
@@ -1331,6 +1582,20 @@ def get_provider(provider_name: str, config: dict):
 
 @app.get("/ai_prediction/{data_idx}")
 def get_ai_prediction(data_idx: int):
+    """Generate AI predictions for a row using the configured LLM provider.
+
+    Collects few-shot examples from other labeled rows, builds the prediction
+    prompt via build_prediction_prompt(), dispatches to the provider selected
+    via --llm-provider (or auto-derived), and adds position data if
+    save_phrase_positions is enabled.
+
+    Args:
+        data_idx: 0-based row index.
+
+    Returns:
+        List of predicted aspect dicts with keys: aspect_term, aspect_category,
+        sentiment_polarity, opinion_term, at_start, at_end, ot_start, ot_end.
+    """
     try:
         data = load_data()
         config = load_config()
@@ -1562,6 +1827,18 @@ async def startup_event():
 
 @app.post("/review/{data_idx}/save")
 def save_review_triplets(data_idx: int, req: SaveTripletsRequest):
+    """Save annotation triplets for a given row (the PRIMARY save endpoint).
+
+    The frontend's handleNextReview calls this (not POST /annotations/{data_idx}).
+    Accepts a list of triplet dicts and stores them in the label field.
+
+    Args:
+        data_idx: 0-based row index.
+        req: SaveTripletsRequest with {triplets: list} of annotation dicts.
+
+    Returns:
+        dict: {status, message, next_index}
+    """
     try:
         data = load_data()
         if data_idx >= len(data) or data_idx < 0:
@@ -1584,6 +1861,20 @@ def save_review_triplets(data_idx: int, req: SaveTripletsRequest):
 
 @app.post("/agent/chat")
 def agent_chat(req: AgentChatRequest):
+    """Handle chat messages from the Helper Agent panel (POST /agent/chat).
+
+    Builds a system prompt with the review text and model comparison data,
+    appends the last 4 turns of conversation history, dispatches to the
+    configured LLM provider. Falls back to hardcoded Turkish rule-based
+    responses when the provider is unavailable.
+
+    Args:
+        req: AgentChatRequest with review_text, model_a/b_triplets,
+             user_message, chat_history.
+
+    Returns:
+        dict: {reply: str}
+    """
     config = load_config()
     model_a_name = config.get("compare_model_a_name", "Model A")
     model_b_name = config.get("compare_model_b_name", "Model B")
