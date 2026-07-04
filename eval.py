@@ -1,5 +1,5 @@
 import time, os, json, random, signal, argparse
-from main import predict_llm
+from services.llm_providers import predict_llm
 
 def timeout_handler(signum, frame):
     raise TimeoutError("Prediction timed out")
