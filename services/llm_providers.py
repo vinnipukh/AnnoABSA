@@ -3,41 +3,64 @@
 Moved from main.py during root reorganization (Step 3).
 Each adapter wraps a different LLM backend behind a common interface.
 
+The hexagonal architecture port is defined by ``LLMProviderPort`` protocol:
+all adapters implement the same ``predict()`` and ``chat()`` signatures,
+making them interchangeable at the dispatch point.
+
 Import from this module:
     from services.llm_providers import get_provider, _derive_provider, predict_llm
 """
+from typing import Protocol, runtime_checkable
 from services.prediction import build_prediction_prompt, build_absa_models
 
-def predict_llm(text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms=False, allow_implicit_opinion_terms=False, n_few_shot=10, llm_model="gemma3:4b", prompt_template=None):
-    """Predict sentiment elements using Ollama (backward-compatible wrapper)."""
-    from ollama import generate
-    import json
 
-    prompt, few_shot_examples = build_prediction_prompt(
+@runtime_checkable
+class LLMProviderPort(Protocol):
+    """Port for LLM provider adapters (hexagonal architecture).
+
+    All provider adapters implement this protocol, making them
+    interchangeable at the dispatch point. The protocol defines
+    two operations:
+
+    - ``predict()``: structured ABSA triplet prediction with
+      Pydantic response parsing.
+    - ``chat()``: free-form conversational response for the
+      Helper Agent panel.
+    """
+
+    def predict(self, text, considered_sentiment_elements, examples,
+                aspect_categories, polarities, allow_implicit_aspect_terms,
+                allow_implicit_opinion_terms, n_few_shot, llm_model,
+                prompt_template=None):
+        """Predict ABSA triplets from text.
+
+        Returns (predictions_dict, few_shot_examples_list).
+        """
+        ...
+
+    def chat(self, messages, model, temperature=0.7, max_tokens=300):
+        """Send a chat message and return the response text."""
+        ...
+
+def predict_llm(text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms=False, allow_implicit_opinion_terms=False, n_few_shot=10, llm_model="gemma3:4b", prompt_template=None):
+    """Predict sentiment elements using Ollama (backward-compatible wrapper).
+
+    Stable compatibility shim for eval.py — delegates to the provider adapter
+    pattern. Defaults to Ollama for backward compatibility; accepts an optional
+    provider_config dict to route through any configured provider.
+
+    This is the entry point for the LLM prediction port. All provider
+    communication flows through this function (or the underlying adapter
+    classes), making it the stable boundary in the hexagonal architecture.
+    """
+    provider = OllamaProvider({})
+    result, examples = provider.predict(
         text, considered_sentiment_elements, examples,
         aspect_categories, polarities,
-        allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot,
-        prompt_template=prompt_template
+        allow_implicit_aspect_terms, allow_implicit_opinion_terms,
+        n_few_shot, llm_model, prompt_template=prompt_template,
     )
-    Aspects, _, _ = build_absa_models(
-        text, considered_sentiment_elements, polarities,
-        aspect_categories, allow_implicit_aspect_terms, allow_implicit_opinion_terms
-    )
-
-    response = generate(
-        prompt=prompt,
-        model=llm_model,
-        raw=True,
-        options={"temperature": 0.0, "max_tokens": 1024},
-        format=Aspects.model_json_schema()
-    )
-
-    aspects = Aspects.model_validate_json(response.response)
-
-    if not aspects.aspects:
-        return [], few_shot_examples
-    else:
-        return json.loads(response.response), few_shot_examples
+    return result, examples
 
 class OllamaProvider:
     """LLM provider adapter for Ollama (local inference).

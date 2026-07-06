@@ -8,7 +8,7 @@ After root reorganization, the backend spans four files:
 
 | File | Lines | Purpose |
 |---|---|---|
-| `main.py` | ~1022 | Global state, data I/O, all 12 HTTP endpoints, startup |
+| `main.py` | ~1053 | Global state, data I/O, all 13 HTTP endpoints, startup |
 | `models/schemas.py` | ~12 | Pydantic request models |
 | `services/prediction.py` | ~357 | Prompt building, BM25 retrieval, position logic, template constants |
 | `services/llm_providers.py` | ~502 | LLM provider adapters, registry, factory, dispatch |
@@ -175,6 +175,11 @@ Used by `get_provider()` to map provider name → class.
 - **Handles:** STD tuple format, STD list format, dict format.
 - **Handles empty/null:** `None`, `"nan"`, `"None"`, `"[]"`, `""` all return `[]`.
 - **Called by:** `get_data()` and `_load_comparison_csv()`.
+- **Backward-compat note:** Old-format CSV files with `aspect_triplets` / `new_triplets` columns
+  (instead of the current `--compare-model-*-csv` pattern) are still supported by `get_data()`
+  via ~10 lines of backward-compat code. Examples: `evaluation/data/semevaltr/semeval_train_deepseek_relabeled.csv`,
+  `examples/user_dataset.csv`. These files use STD tuples for column A and STD lists for column B.
+  The backward-compat code can be removed once all datasets are migrated.
 
 #### `_load_comparison_csv(csv_path, data_idx, review_text, prefix) -> list`
 - **Purpose:** Load triplets from an external comparison CSV.
@@ -207,8 +212,9 @@ Used by `get_provider()` to map provider name → class.
 ## main.py — FastAPI Endpoints
 
 | Method | Path | Handler | Purpose |
-|---|---|---|---|
+|---|---|---|---|---|
 | GET | `/settings` | `get_settings()` | Return config + row count (acts as health check) |
+| PATCH | `/settings` | `update_settings()` | Merge config updates into CONFIG_DATA + persist to JSON file |
 | GET | `/data/{data_idx}` | `get_data()` | Return a row's review text, label, comparison triplets, reasoning |
 | POST | `/timing/{data_idx}` | `post_timing()` | Append a timing entry (duration + change flag) |
 | POST | `/auto-add-positions` | `manual_auto_add_positions()` | Manually trigger `auto_add_missing_positions()` |

@@ -19,36 +19,10 @@ from typing import List, Dict, Any
 import ast
 import pandas as pd
 
-# ── Prompt template defaults (mirrored from main.py to avoid import-time side effects) ──
+# ── Prompt template defaults (imported from services to avoid duplication) ──
 
-CLI_DEFAULT_LABELING_TEMPLATE = (
-    "Aşağıdaki duygu unsuru tanımlarına göre:\n"
-    "\n"
-    "- 'aspect term' (görünüş terimi), kullanıcının bir ürün veya hizmetin belirli bir özelliği "
-    "hakkında görüş belirttiği, metindeki tam kelime veya kelime öbeğidir. {implicit_aspect_note}\n"
-    "- 'aspect category' (görünüş kategorisi), görünüşün ait olduğu kategoridir. Mevcut kategoriler "
-    "(bu kategori adlarını İngilizce olduğu gibi bırakın, çevirmeyin): {aspect_categories}\n"
-    "- 'sentiment polarity' (duygu kutbu), ifade edilen görüşün olumluluk, olumsuzluk ya da nötrlük "
-    "derecesidir. Mevcut kutuplar (İngilizce olduğu gibi bırakın, çevirmeyin): {polarities}\n"
-    "- 'opinion term' (görüş terimi), kullanıcının bir görünüşe yönelik tutumunu ifade eden, "
-    "metindeki tam kelime veya kelime öbeğidir. {implicit_opinion_note}\n"
-    "\n"
-    "Metin Türkçedir ve Türkçe sondan eklemeli (agglutinative) bir dildir: aynı kök farklı çekim "
-    "ekleriyle görünebilir (ör. \"kitap\", \"kitabı\", \"kitaplarımdan\"). Görünüş ve görüş "
-    "terimlerini ararken kelimenin metindeki tam, çekimli halini seçin — kökü ayırıp yeniden "
-    "yazmayın.\n"
-    "\n"
-    "Aşağıdaki metindeki tüm duygu unsurlarını, karşılık gelen {element_names} ile birlikte, her "
-    "biri {element_keys} anahtarlarına sahip nesnelerden oluşan bir liste biçiminde tanıyın."
-)
-
-CLI_DEFAULT_CHAT_TEMPLATE = (
-    'Sen ABSA (Aspect-Based Sentiment Analysis) veri etiketleme asistanısın. '
-    'Şu incelemeyi tartışıyorsunuz: "{review_text}". '
-    '{model_a_name} tripletleri: {model_a_triplets}, '
-    '{model_b_name} tripletleri: {model_b_triplets}. '
-    "Kullanıcıya mantıklı, akıl yürüterek açıklama yap."
-)
+from services.prediction import DEFAULT_LABELING_TEMPLATE as CLI_DEFAULT_LABELING_TEMPLATE
+from services.prediction import DEFAULT_CHAT_TEMPLATE as CLI_DEFAULT_CHAT_TEMPLATE
 
 # Global variable to track backend process
 backend_process = None
@@ -903,29 +877,19 @@ Examples:
         config.set_n_few_shot(args.n_few_shot)
 
     # LLM provider: use explicit flag, or derive from configured keys
-    # NOTE: Must match _derive_provider() in main.py — cannot import to avoid
-    # import-time side effects (FastAPI app creation, env-var reads).
-    # See Task 4 precedent for the template-constant duplication.
-    if args.llm_provider:
-        config.set_llm_provider(args.llm_provider)
-    else:
-        configured = [
-            name for name, flag in [
-                ("openai", args.openai_key),
-                ("anthropic", args.anthropic_key),
-                ("vllm", args.vllm_url),
-            ] if flag
-        ]
-        if len(configured) > 1:
-            print(
-                f"❌ Error: multiple providers configured ({', '.join(configured)}) "
-                f"but --llm-provider not specified. Pick one explicitly."
-            )
-            sys.exit(1)
-        elif len(configured) == 1:
-            config.set_llm_provider(configured[0])
-        else:
-            config.set_llm_provider("ollama")
+    from services.llm_providers import _derive_provider
+    provider_config = {
+        "llm_provider": args.llm_provider,
+        "openai_key": args.openai_key,
+        "anthropic_key": args.anthropic_key,
+        "vllm_url": args.vllm_url,
+    }
+    try:
+        derived = _derive_provider(provider_config)
+    except ValueError as e:
+        print(f"❌ Error: {e}")
+        sys.exit(1)
+    config.set_llm_provider(derived)
 
     if args.llm_model:
         config.set_llm_model(args.llm_model)

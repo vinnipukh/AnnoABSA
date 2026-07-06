@@ -44,9 +44,12 @@ project root/
 ## What Changed
 
 - `eval.py` — import changed from `from main import predict_llm` to `from services.llm_providers import predict_llm`
-- `cli.py` — **untouched** (its inline `_derive_provider` copy stays with sync comment)
+- `cli.py` — inline constants replaced with imports from `services/prediction` and `services/llm_providers` (issue #4 — eliminated duplicate template constants and `_derive_provider` copy)
+- `services/llm_providers.py` — added `LLMProviderPort` hexagonal-architecture protocol; rewrote `predict_llm` as a stable shim delegating to `OllamaProvider`
 - `architecture_map.md` — updated to reflect new structure
 - `agentdocs/mainpy_functions.md` → `agentdocs/backend_reference.md` — renamed and updated
+- `agentdocs/ProjectPrimer.md` — updated with data format spec and how-to-run guide
+- `agentdocs/phase2_prep.md` — issues 1–6 resolved
 
 ## Verification
 

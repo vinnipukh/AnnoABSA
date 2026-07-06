@@ -63,4 +63,18 @@ export interface Settings {
   auto_clean_phrases: boolean;
   save_phrase_positions: boolean;
   click_on_token: boolean;
+  store_time: boolean;
+  display_avg_annotation_time: boolean;
+  enable_pre_prediction: boolean;
+  disable_ai_automatic_prediction: boolean;
+  llm_provider: string;
+  llm_model: string;
+  vllm_model: string;
+  openai_key: string | null;
+  anthropic_key: string | null;
+  vllm_url: string | null;
+  n_few_shot: number;
+  compare_model_a_name: string | null;
+  compare_model_b_name: string | null;
+  theme: string;
 }

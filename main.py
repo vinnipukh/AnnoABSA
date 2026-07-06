@@ -111,7 +111,8 @@ def load_config():
         "compare_model_b_csv": None,
         "compare_model_b_name": None,
         "labeling_prompt_template": DEFAULT_LABELING_TEMPLATE,
-        "helper_agent_prompt_template": DEFAULT_CHAT_TEMPLATE
+        "helper_agent_prompt_template": DEFAULT_CHAT_TEMPLATE,
+        "theme": "dark"
     }
 
 
@@ -186,6 +187,14 @@ def get_settings():
         "enable_pre_prediction": CONFIG_DATA.get("enable_pre_prediction", CONFIG_DATA.get("enable_preprediction", False)),
         "disable_ai_automatic_prediction": CONFIG_DATA.get("disable_ai_automatic_prediction", False),
         "annotation_guideline": CONFIG_DATA.get("annotation_guideline", None),
+        "theme": CONFIG_DATA.get("theme", "dark"),
+        "llm_provider": CONFIG_DATA.get("llm_provider", "ollama"),
+        "llm_model": CONFIG_DATA.get("llm_model", "gemma3:4b"),
+        "vllm_model": CONFIG_DATA.get("vllm_model", None),
+        "vllm_url": CONFIG_DATA.get("vllm_url", None),
+        "n_few_shot": CONFIG_DATA.get("n_few_shot", 10),
+        "compare_model_a_name": CONFIG_DATA.get("compare_model_a_name", None),
+        "compare_model_b_name": CONFIG_DATA.get("compare_model_b_name", None),
         "current_index": get_current_index(),
         "max_number_of_idxs": max_number_of_idxs()
     }
@@ -195,6 +204,37 @@ def get_settings():
         settings["session_id"] = CONFIG_DATA["session_id"]
 
     return settings
+
+
+@app.patch("/settings")
+def update_settings(updates: dict):
+    """Merge updates into CONFIG_DATA and persist to config JSON file.
+
+    Accepts a JSON body with one or more config key-value pairs.
+    Changes take effect immediately in-memory and are persisted to disk.
+    Does NOT re-instantiate providers or reload comparison CSVs.
+
+    Args:
+        updates: Dict of config key-value pairs to update.
+
+    Returns:
+        {"status": "ok"}
+    """
+    global CONFIG_DATA
+    try:
+        # Merge updates into the in-memory config
+        for key, value in updates.items():
+            CONFIG_DATA[key] = value
+
+        # Persist to config JSON file if a path is configured
+        if CONFIG_PATH:
+            with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+                json.dump(CONFIG_DATA, f, indent=2, ensure_ascii=False)
+
+        return {"status": "ok"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error updating settings: {str(e)}")
 
 
 

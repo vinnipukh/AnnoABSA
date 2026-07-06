@@ -1,5 +1,13 @@
 [project]
 name = "annoabsa"
 version = "0.1.0"
-requires-python = ">=3.14"
-dependencies = []
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pandas",
+    "rank-bm25",
+    "openai",
+    "ollama",
+    "anthropic",
+]

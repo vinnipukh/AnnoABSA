@@ -40,8 +40,9 @@ main.py  (residual — ~300 lines)
 │  Config: load_config(), set_config()
 │  Helper methods: get_total_count(), get_current_index(), max_number_of_idxs()
 │  Position logic: auto_add_missing_positions()
-│  Endpoints (12 total, all still registered here):
+│  Endpoints (13 total, all still registered here):
 │    GET  /settings
+│    PATCH /settings
 │    GET  /data/{data_idx}
 │    POST /timing/{data_idx}
 │    POST /auto-add-positions
@@ -210,7 +211,7 @@ See `services/llm_providers.py` docstring for details.
 
 | File(s) | What lives there | Phase 1 task |
 |---|---|---|
-| `main.py` | Global state, data I/O, config functions, all 12 HTTP endpoints, startup event | Residual — not from any single task |
+| `main.py` | Global state, data I/O, config functions, all 13 HTTP endpoints, startup event | Residual / Phase 2 Task 2 (PATCH /settings) |
 | `models/schemas.py` | SaveTripletsRequest, AgentChatRequest | Step 2 of root reorg |
 | `services/prediction.py` | Templates, prompt builders, BM25 retrieval, position helpers | Step 4 of root reorg |
 | `services/llm_providers.py` | 4 provider adapter classes, registry, factory, _derive_provider, predict_llm | Task 3 + Step 3 of root reorg |
@@ -220,6 +221,8 @@ See `services/llm_providers.py` docstring for details.
 | `frontend/src/components/PhraseAnnotator.tsx` | Click-to-select span annotator | Task 5 (new file) |
 | `frontend/src/components/ModelTripletColumn.tsx` | Generic comparison column | Task 2 (consumer only) |
 | `frontend/src/components/ManualInputForm.tsx` | Dropdown-based manual triplet entry | Unchanged |
+| `frontend/src/components/AISuggestions.tsx` | AI suggestion list with accept/reject | Phase 2 Task 1 |
+| `frontend/src/components/SettingsPanel.tsx` | Settings modal with 5 sections (Annotation, AI/LLM, Timing, Data, Utilities) | Phase 2 Task 2 |
 | `frontend/src/components/HelperAgentChatbox.tsx` | Floating chat panel | Unchanged |
 | `eval.py` | Standalone evaluation script | Imports predict_llm from services/llm_providers |
 | `eval_exc.py` | Multi-process eval launcher | Unchanged |

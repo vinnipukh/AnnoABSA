@@ -4,6 +4,8 @@ import { ModelTripletColumn } from './components/ModelTripletColumn';
 import { ManualInputForm } from './components/ManualInputForm';
 import { HelperAgentChatbox } from './components/HelperAgentChatbox';
 import { PhraseAnnotator } from './components/PhraseAnnotator';
+import { AISuggestions, AiSuggestionItem } from './components/AISuggestions';
+import { SettingsPanel } from './components/SettingsPanel';
 
 const FALLBACK_DATA: ReviewComparisonData[] = [
   {
@@ -76,6 +78,12 @@ const DEFAULT_SETTINGS: Settings = {
   aspect_categories: ['RESTAURANT#GENERAL','FOOD#QUALITY','SERVICE#GENERAL','AMBIENCE#GENERAL','FOOD#PRICES','FOOD#STYLE_OPTIONS'],
   implicit_aspect_term_allowed: true, implicit_opinion_term_allowed: false,
   auto_clean_phrases: true, save_phrase_positions: true, click_on_token: true,
+  store_time: false, display_avg_annotation_time: false,
+  enable_pre_prediction: false, disable_ai_automatic_prediction: false,
+  llm_provider: 'ollama', llm_model: 'gemma3:4b', vllm_model: '',
+  openai_key: null, anthropic_key: null, vllm_url: null,
+  n_few_shot: 10, compare_model_a_name: null, compare_model_b_name: null,
+  theme: 'dark',
 };
 
 export default function App() {
@@ -93,6 +101,15 @@ export default function App() {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [showFloatingChat, setShowFloatingChat] = useState(true);
   const [saveToast, setSaveToast] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+
+  // AI Suggestions state
+  const [aiSuggestions, setAiSuggestions] = useState<AiSuggestionItem[]>([]);
+  const [isAIPredicting, setIsAIPredicting] = useState(false);
+  const [aiTriggeredForIndex, setAiTriggeredForIndex] = useState(false);
+  const [enablePrePrediction, setEnablePrePrediction] = useState(false);
+  const [disableAiAutomaticPrediction, setDisableAiAutomaticPrediction] = useState(false);
+  const aiAbortRef = useRef<AbortController | null>(null);
 
   const backendUrl = import.meta.env?.VITE_BACKEND_URL || 'http://localhost:8000';
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -114,7 +131,6 @@ export default function App() {
       setSaveToast('❌ Yükleme başarısız — backend çalışıyor mu?');
       setTimeout(() => setSaveToast(null), 3000);
     }
-    // Reset so the same file can be chosen again
     e.target.value = '';
   };
 
@@ -128,8 +144,6 @@ export default function App() {
       if (!res.ok) throw new Error("API Offline");
       const data = await res.json();
       setCurrentData(data);
-      // Restore previously saved triplets from the label field
-      // label is a JSON string from the API (TripletItem[] from FALLBACK_DATA)
       if (data.label) {
         let parsed: unknown;
         if (typeof data.label === 'string') {
@@ -163,11 +177,32 @@ export default function App() {
           auto_clean_phrases: s.auto_clean_phrases ?? true,
           save_phrase_positions: s.save_phrase_positions ?? true,
           click_on_token: s.click_on_token ?? true,
+          store_time: s.store_time ?? false,
+          display_avg_annotation_time: s.display_avg_annotation_time ?? false,
+          enable_pre_prediction: s.enable_pre_prediction ?? false,
+          disable_ai_automatic_prediction: s.disable_ai_automatic_prediction ?? false,
+          llm_provider: s.llm_provider ?? 'ollama',
+          llm_model: s.llm_model ?? 'gemma3:4b',
+          vllm_model: s.vllm_model ?? '',
+          openai_key: s.openai_key ?? null,
+          anthropic_key: s.anthropic_key ?? null,
+          vllm_url: s.vllm_url ?? null,
+          n_few_shot: s.n_few_shot ?? 10,
+          compare_model_a_name: s.compare_model_a_name ?? null,
+          compare_model_b_name: s.compare_model_b_name ?? null,
+          theme: s.theme ?? 'dark',
         });
+        setEnablePrePrediction(s.enable_pre_prediction === true);
+        setDisableAiAutomaticPrediction(s.disable_ai_automatic_prediction === true);
         if (s.total_count) setTotalCount(s.total_count);
       })
       .catch(() => {});
   }, []);
+
+  // Apply DaisyUI theme to document root
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', settings.theme);
+  }, [settings.theme]);
 
   useEffect(() => { loadReviewRow(currentIndex); }, [currentIndex]);
 
@@ -187,6 +222,9 @@ export default function App() {
   const clearAllModelB = () => setSelectedModelBIds(new Set());
 
   const handleNextReview = async () => {
+    abortAIPrediction();
+    setAiSuggestions([]);
+    setAiTriggeredForIndex(false);
     const approved: any[] = [];
     currentData.model_a_triplets.forEach(t => { if (selectedModelAIds.has(t.id)) approved.push(t); });
     currentData.model_b_triplets.forEach(t => { if (selectedModelBIds.has(t.id)) approved.push(t); });
@@ -228,100 +266,243 @@ export default function App() {
     } finally { setIsChatLoading(false); }
   };
 
+  // ── AI Suggestions ──
+
+  const abortAIPrediction = () => {
+    if (aiAbortRef.current) {
+      aiAbortRef.current.abort();
+      aiAbortRef.current = null;
+    }
+    setIsAIPredicting(false);
+  };
+
+  const fetchAIPrediction = async () => {
+    abortAIPrediction();
+    const controller = new AbortController();
+    aiAbortRef.current = controller;
+    setIsAIPredicting(true);
+    try {
+      const res = await fetch(`${backendUrl}/ai_prediction/${currentIndex}`, {
+        signal: controller.signal,
+      });
+      const predictions: AiSuggestionItem[] = await res.json();
+      if (Array.isArray(predictions)) {
+        setAiSuggestions(predictions);
+      }
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') {
+        // Aborted — expected on rapid navigation
+      } else {
+        console.error('AI prediction error:', e);
+      }
+    } finally {
+      setIsAIPredicting(false);
+      aiAbortRef.current = null;
+    }
+  };
+
+  const handleAcceptSuggestion = (item: AiSuggestionItem) => {
+    const newId = `ai_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const triplet: TripletItem = {
+      id: newId,
+      aspect_term: item.aspect_term || 'NULL',
+      aspect_category: item.aspect_category,
+      sentiment_polarity: item.sentiment_polarity || 'neutral',
+      opinion_term: item.opinion_term || '',
+    };
+    if (item.at_start !== undefined && item.at_start !== null) triplet.at_start = item.at_start;
+    if (item.at_end !== undefined && item.at_end !== null) triplet.at_end = item.at_end;
+    if (item.ot_start !== undefined && item.ot_start !== null) triplet.ot_start = item.ot_start;
+    if (item.ot_end !== undefined && item.ot_end !== null) triplet.ot_end = item.ot_end;
+    setManualTriplets(p => [...p, triplet]);
+  };
+
+  const handleRejectSuggestion = (index: number) => {
+    setAiSuggestions(p => p.filter((_, i) => i !== index));
+  };
+
+  useEffect(() => {
+    setAiSuggestions([]);
+    setAiTriggeredForIndex(false);
+    abortAIPrediction();
+  }, [currentIndex]);
+
+  useEffect(() => {
+    const shouldAutoTrigger =
+      enablePrePrediction &&
+      !disableAiAutomaticPrediction &&
+      manualTriplets.length === 0 &&
+      !aiTriggeredForIndex &&
+      !isAIPredicting;
+    if (shouldAutoTrigger) {
+      setAiTriggeredForIndex(true);
+      fetchAIPrediction();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, enablePrePrediction, disableAiAutomaticPrediction, manualTriplets.length, aiTriggeredForIndex]);
+
+  // ── Settings Panel ──
+
+  const handleSaveSettings = async (updates: Record<string, unknown>) => {
+    try {
+      const res = await fetch(`${backendUrl}/settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) throw new Error('PATCH /settings failed');
+      setSettings(prev => ({ ...prev, ...updates }));
+      if (typeof updates.enable_pre_prediction === 'boolean') {
+        setEnablePrePrediction(updates.enable_pre_prediction);
+      }
+      if (typeof updates.disable_ai_automatic_prediction === 'boolean') {
+        setDisableAiAutomaticPrediction(updates.disable_ai_automatic_prediction);
+      }
+      setSaveToast('✅ Ayarlar kaydedildi');
+      setTimeout(() => setSaveToast(null), 2500);
+    } catch (_) {
+      setSaveToast('❌ Ayarlar kaydedilemedi');
+      setTimeout(() => setSaveToast(null), 2500);
+    }
+  };
+
+  const handleRescanPositions = async () => {
+    try {
+      const res = await fetch(`${backendUrl}/auto-add-positions`, { method: 'POST' });
+      if (!res.ok) throw new Error('auto-add-positions failed');
+      setSaveToast('✅ Pozisyonlar yeniden tarandı');
+      setTimeout(() => setSaveToast(null), 2500);
+    } catch (_) {
+      setSaveToast('❌ Pozisyon taraması başarısız');
+      setTimeout(() => setSaveToast(null), 2500);
+    }
+  };
+
   const tripletCount = mode === 'compare'
     ? selectedModelAIds.size + selectedModelBIds.size + manualTriplets.length
     : manualTriplets.length;
 
   return (
-    <div className="dark bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-blue-500 selection:text-white">
-      {/* Header */}
-      <header className="h-12 bg-slate-900/90 border-b border-slate-800 px-4 flex items-center justify-between flex-shrink-0 z-20 shadow-sm">
+    <div className="bg-base-300 text-base-content min-h-screen flex flex-col font-sans selection:bg-primary selection:text-primary-content">
+      <header className="h-12 bg-base-200/90 border-b border-base-300 px-4 flex items-center justify-between flex-shrink-0 z-20 shadow-sm">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-black text-white shadow text-sm">A</div>
-          <h1 className="text-sm font-bold text-white">AnnoABSA</h1>
+          <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center font-black text-primary-content shadow text-sm">A</div>
+          <h1 className="text-sm font-bold text-base-content">AnnoABSA</h1>
         </div>
         <div className="flex items-center gap-2">
-          {/* Mode toggle */}
-          <div className="flex bg-slate-800/80 border border-slate-700 rounded-lg p-0.5">
+          <div className="flex bg-base-300/80 border border-base-300 rounded-lg p-0.5">
             <button onClick={() => setMode('compare')}
               className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all select-none ${
-                mode === 'compare' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                mode === 'compare' ? 'bg-primary text-primary-content shadow' : 'text-base-content/60 hover:text-base-content'
               }`}>Karşılaştır</button>
             <button onClick={() => setMode('manual')}
               className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all select-none ${
-                mode === 'manual' ? 'bg-amber-500 text-black shadow' : 'text-slate-400 hover:text-slate-200'
+                mode === 'manual' ? 'bg-warning text-warning-content shadow' : 'text-base-content/60 hover:text-base-content'
               }`}>Manuel</button>
           </div>
-          {/* Chat toggle */}
+          <button onClick={() => setShowSettings(true)}
+            className="p-1.5 rounded-lg bg-base-200 hover:bg-base-300 text-base-content/60 hover:text-base-content transition-colors border border-base-300"
+            title="Ayarlar">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
           <button onClick={() => setShowFloatingChat(p => !p)}
             className={`p-1.5 rounded-lg transition-all border ${
-              showFloatingChat ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' : 'bg-slate-800 text-slate-500 border-slate-700 hover:text-slate-300'
+              showFloatingChat ? 'bg-primary/20 text-primary border-primary/30' : 'bg-base-200 text-base-content/50 border-base-300 hover:text-base-content'
             }`} title={showFloatingChat ? 'Sohbeti Kapat' : 'Sohbeti Aç'}>
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
             </svg>
           </button>
-          {/* File upload */}
+          {enablePrePrediction && (
+            <button onClick={fetchAIPrediction} disabled={isAIPredicting}
+              className={`p-1.5 rounded-lg transition-all border text-xs font-bold ${
+                isAIPredicting
+                  ? 'bg-primary/20 text-primary border-primary/30 animate-pulse'
+                  : aiSuggestions.length > 0
+                  ? 'bg-success/20 text-success border-success/30 hover:bg-success/30'
+                  : 'bg-base-200 text-base-content/50 border-base-300 hover:text-primary hover:border-primary/40'
+              }`}
+              title={isAIPredicting ? 'AI tahmin ediyor...' : 'AI Önerisi Al'}>
+              {isAIPredicting ? (
+                <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              )}
+            </button>
+          )}
           <input ref={fileInputRef} type="file" accept=".csv,.json" onChange={handleFileUpload} className="hidden" />
           <button onClick={() => fileInputRef.current?.click()}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors border border-slate-700"
+            className="p-1.5 rounded-lg bg-base-200 hover:bg-base-300 text-base-content/60 hover:text-base-content transition-colors border border-base-300"
             title="CSV/JSON Yükle">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
           </button>
-          {/* Nav */}
           <div className="flex items-center gap-1.5 text-[11px] font-mono">
-            <span className="text-slate-500">Satır:</span>
-            <span className="bg-slate-800 px-2 py-0.5 rounded text-blue-400 font-bold border border-slate-700">#{currentIndex + 1}/{totalCount}</span>
+            <span className="text-base-content/50">Satır:</span>
+            <span className="bg-base-200 px-2 py-0.5 rounded text-primary font-bold border border-base-300">#{currentIndex + 1}/{totalCount}</span>
             <button onClick={() => setCurrentIndex(p => (p - 1 + totalCount) % totalCount)}
-              className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-colors text-xs" title="Önceki">◀</button>
+              className="p-1 rounded hover:bg-base-300 text-base-content/50 hover:text-base-content transition-colors text-xs" title="Önceki">◀</button>
             <button onClick={() => setCurrentIndex(p => (p + 1) % totalCount)}
-              className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-colors text-xs" title="Sonraki">▶</button>
+              className="p-1 rounded hover:bg-base-300 text-base-content/50 hover:text-base-content transition-colors text-xs" title="Sonraki">▶</button>
           </div>
         </div>
       </header>
 
-      {/* Main workspace: natural flex, no fixed percentage splits */}
       <main className="flex-1 p-3 flex flex-col max-w-[1700px] w-full mx-auto h-[calc(100vh-3rem)] overflow-hidden">
-        {/* Annotation workspace (takes all available space) */}
         <section className="flex-1 min-h-0">
           {mode === 'compare' ? (
             <div className="h-full grid grid-cols-1 md:grid-cols-3 gap-3">
               <ModelTripletColumn title={currentData.model_a_name ? `Model A - ${currentData.model_a_name}` : "Model A"}
                 subtitle="" badgeText={currentData.model_a_name || "MODEL A"}
-                badgeColor="bg-purple-500/10 text-purple-300 border-purple-500/30"
+                badgeColor="bg-secondary/10 text-secondary border-secondary/30"
                 triplets={currentData.model_a_triplets} selectedIds={selectedModelAIds}
                 onToggleSelect={toggleModelA} onSelectAll={selectAllModelA} onClearAll={clearAllModelA} />
-              <ManualInputForm reviewText={currentData.review_text} translation={currentData.translation}
-                categories={currentData.aspect_category_list} polarities={['positive','negative','neutral']}
-                manualTriplets={manualTriplets}
-                onAddTriplet={t => setManualTriplets(p => [...p, t])}
-                onRemoveTriplet={id => setManualTriplets(p => p.filter(m => m.id !== id))} />
+              <div className="flex flex-col h-full overflow-hidden">
+                <div className="flex-1 min-h-0">
+                  <ManualInputForm reviewText={currentData.review_text} translation={currentData.translation}
+                    categories={currentData.aspect_category_list} polarities={['positive','negative','neutral']}
+                    manualTriplets={manualTriplets}
+                    onAddTriplet={t => setManualTriplets(p => [...p, t])}
+                    onRemoveTriplet={id => setManualTriplets(p => p.filter(m => m.id !== id))} />
+                </div>
+                {aiSuggestions.length > 0 && (
+                  <AISuggestions suggestions={aiSuggestions} onAccept={handleAcceptSuggestion} onReject={handleRejectSuggestion} />
+                )}
+              </div>
               <ModelTripletColumn title={currentData.model_b_name ? `Model B - ${currentData.model_b_name}` : "Model B"}
                 subtitle="" badgeText={currentData.model_b_name || "MODEL B"}
-                badgeColor="bg-cyan-500/10 text-cyan-300 border-cyan-500/30"
+                badgeColor="bg-accent/10 text-accent border-accent/30"
                 triplets={currentData.model_b_triplets} selectedIds={selectedModelBIds}
                 onToggleSelect={toggleModelB} onSelectAll={selectAllModelB} onClearAll={clearAllModelB} />
             </div>
           ) : (
-            <div className="h-full">
-              <PhraseAnnotator reviewText={currentData.review_text}
-                categories={currentData.aspect_category_list}
-                polarities={settings.sentiment_polarity_options}
-                clickOnToken={settings.click_on_token}
-                implicitAspectAllowed={settings.implicit_aspect_term_allowed}
-                implicitOpinionAllowed={settings.implicit_opinion_term_allowed}
-                autoCleanPhrases={settings.auto_clean_phrases}
-                annotations={manualTriplets}
-                onAddAnnotation={t => setManualTriplets(p => [...p, t])}
-                onRemoveAnnotation={id => setManualTriplets(p => p.filter(m => m.id !== id))} />
+            <div className="h-full flex flex-col overflow-hidden">
+              <div className="flex-1 min-h-0">
+                <PhraseAnnotator reviewText={currentData.review_text}
+                  categories={currentData.aspect_category_list}
+                  polarities={settings.sentiment_polarity_options}
+                  clickOnToken={settings.click_on_token}
+                  implicitAspectAllowed={settings.implicit_aspect_term_allowed}
+                  implicitOpinionAllowed={settings.implicit_opinion_term_allowed}
+                  autoCleanPhrases={settings.auto_clean_phrases}
+                  annotations={manualTriplets}
+                  onAddAnnotation={t => setManualTriplets(p => [...p, t])}
+                  onRemoveAnnotation={id => setManualTriplets(p => p.filter(m => m.id !== id))} />
+              </div>
+              {aiSuggestions.length > 0 && (
+                <AISuggestions suggestions={aiSuggestions} onAccept={handleAcceptSuggestion} onReject={handleRejectSuggestion} />
+              )}
             </div>
           )}
         </section>
       </main>
 
-      {/* Floating chat widget */}
       {showFloatingChat && (
         <HelperAgentChatbox
           initialReasoning={currentData.agent_initial_reasoning}
@@ -331,26 +512,33 @@ export default function App() {
         />
       )}
 
-      {/* Bottom bar: save button + status */}
-      <footer className="h-10 bg-slate-900/90 border-t border-slate-800 px-4 flex items-center justify-between flex-shrink-0 z-20">
-        <span className="text-[10px] text-slate-600 font-mono">
+      <footer className="h-10 bg-base-200/90 border-t border-base-300 px-4 flex items-center justify-between flex-shrink-0 z-20">
+        <span className="text-[10px] text-base-content/40 font-mono">
           {tripletCount} etiket seçildi · {mode === 'manual' ? 'Manuel' : 'Karşılaştırma'} modu
         </span>
         <div className="flex items-center gap-2">
           <button onClick={() => { setManualTriplets([]); setSelectedModelAIds(new Set()); setSelectedModelBIds(new Set()); }}
-            className="text-[10px] px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 transition-colors border border-slate-700 select-none">
+            className="text-[10px] px-2.5 py-1 rounded-lg bg-base-200 hover:bg-base-300 text-base-content/60 transition-colors border border-base-300 select-none">
             Temizle
           </button>
           <button onClick={handleNextReview}
-            className="text-[11px] px-4 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold transition-all shadow-sm select-none flex items-center gap-1.5">
+            className="text-[11px] px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-content font-bold transition-all shadow-sm select-none flex items-center gap-1.5">
             <span>Kaydet & Geç</span>
-            <span className="text-blue-200">▶</span>
+            <span className="text-primary-content/80">▶</span>
           </button>
         </div>
       </footer>
 
+      {showSettings && (
+        <SettingsPanel
+          settings={settings}
+          onSave={handleSaveSettings}
+          onRescanPositions={handleRescanPositions}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
       {saveToast && (
-        <div className="fixed bottom-14 left-1/2 -translate-x-1/2 bg-slate-900 border border-emerald-500/50 text-emerald-300 px-4 py-2 rounded-xl shadow-2xl z-50 flex items-center text-xs font-semibold backdrop-blur-md">
+        <div className="fixed bottom-14 left-1/2 -translate-x-1/2 bg-base-100 border border-success/50 text-success px-4 py-2 rounded-xl shadow-2xl z-50 flex items-center text-xs font-semibold backdrop-blur-md">
           {saveToast}
         </div>
       )}
