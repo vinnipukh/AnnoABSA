@@ -259,7 +259,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               options={[
                 { value: 'light', label: 'Açık' },
                 { value: 'dark', label: 'Koyu' },
-                { value: 'caramellatte', label: 'Karamel' },
+                { value: 'coffee', label: 'Kahve' },
                 { value: 'forest', label: 'Orman' },
               ]}
             />
