@@ -6,6 +6,7 @@ import { HelperAgentChatbox } from './components/HelperAgentChatbox';
 import { PhraseAnnotator } from './components/PhraseAnnotator';
 import { AISuggestions, AiSuggestionItem } from './components/AISuggestions';
 import { SettingsPanel } from './components/SettingsPanel';
+import { EditReviewTextModal } from './components/EditReviewTextModal';
 
 const FALLBACK_DATA: ReviewComparisonData[] = [
   {
@@ -80,6 +81,7 @@ const DEFAULT_SETTINGS: Settings = {
   auto_clean_phrases: true, save_phrase_positions: true, click_on_token: true,
   store_time: false, display_avg_annotation_time: false,
   enable_pre_prediction: false, disable_ai_automatic_prediction: false,
+  enable_helper_agent: true,
   llm_provider: 'ollama', llm_model: 'gemma3:4b', vllm_model: '',
   openai_key: null, anthropic_key: null, vllm_url: null,
   n_few_shot: 10, compare_model_a_name: null, compare_model_b_name: null,
@@ -102,6 +104,7 @@ export default function App() {
   const [showFloatingChat, setShowFloatingChat] = useState(true);
   const [saveToast, setSaveToast] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showEditReview, setShowEditReview] = useState(false);
 
   // AI Suggestions state
   const [aiSuggestions, setAiSuggestions] = useState<AiSuggestionItem[]>([]);
@@ -113,6 +116,8 @@ export default function App() {
 
   const backendUrl = import.meta.env?.VITE_BACKEND_URL || 'http://localhost:8000';
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const startTimeRef = useRef<number>(Date.now());
+  const [avgAnnotationTime, setAvgAnnotationTime] = useState<number | null>(null);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -181,6 +186,7 @@ export default function App() {
           display_avg_annotation_time: s.display_avg_annotation_time ?? false,
           enable_pre_prediction: s.enable_pre_prediction ?? false,
           disable_ai_automatic_prediction: s.disable_ai_automatic_prediction ?? false,
+          enable_helper_agent: s.enable_helper_agent ?? true,
           llm_provider: s.llm_provider ?? 'ollama',
           llm_model: s.llm_model ?? 'gemma3:4b',
           vllm_model: s.vllm_model ?? '',
@@ -204,7 +210,10 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', settings.theme);
   }, [settings.theme]);
 
-  useEffect(() => { loadReviewRow(currentIndex); }, [currentIndex]);
+  useEffect(() => {
+    loadReviewRow(currentIndex);
+    startTimeRef.current = Date.now();
+  }, [currentIndex]);
 
   const toggleModelA = (id: string) => {
     const n = new Set(selectedModelAIds);
@@ -235,6 +244,27 @@ export default function App() {
         body: JSON.stringify({ triplets: approved }),
       });
     } catch (_) {}
+
+    // Record timing if enabled
+    if (settings.store_time) {
+      const duration = Date.now() - startTimeRef.current;
+      const hadChange = approved.length > 0;
+      try {
+        await fetch(`${backendUrl}/timing/${currentIndex}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ duration, change: hadChange }),
+        });
+      } catch (_) {}
+    }
+
+    // Refresh average annotation time display if enabled
+    if (settings.display_avg_annotation_time) {
+      try {
+        const res = await fetch(`${backendUrl}/avg-annotation-time`);
+        const data = await res.json();
+        if (data.avg_annotation_time != null) setAvgAnnotationTime(data.avg_annotation_time);
+      } catch (_) {}
+    }
     setSaveToast(`✅ İnceleme #${currentIndex + 1} kaydedildi (${approved.length} etiket).`);
     setTimeout(() => setSaveToast(null), 2500);
     setCurrentIndex(p => (p + 1) % totalCount);
@@ -378,6 +408,24 @@ export default function App() {
     }
   };
 
+  const handleUpdateReviewText = async (newText: string) => {
+    try {
+      const res = await fetch(`${backendUrl}/review/${currentIndex}/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ triplets: [], review_text: newText }),
+      });
+      if (!res.ok) throw new Error('save failed');
+      setCurrentData(prev => ({ ...prev, review_text: newText, text: newText }));
+      setShowEditReview(false);
+      setSaveToast('✅ İnceleme metni güncellendi');
+      setTimeout(() => setSaveToast(null), 2500);
+    } catch (_) {
+      setSaveToast('❌ Metin güncellenemedi');
+      setTimeout(() => setSaveToast(null), 2500);
+    }
+  };
+
   const tripletCount = mode === 'compare'
     ? selectedModelAIds.size + selectedModelBIds.size + manualTriplets.length
     : manualTriplets.length;
@@ -408,6 +456,7 @@ export default function App() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </button>
+          {settings.enable_helper_agent && (
           <button onClick={() => setShowFloatingChat(p => !p)}
             className={`p-1.5 rounded-lg transition-all border ${
               showFloatingChat ? 'bg-primary/20 text-primary border-primary/30' : 'bg-base-200 text-base-content/50 border-base-300 hover:text-base-content'
@@ -416,6 +465,7 @@ export default function App() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
             </svg>
           </button>
+          )}
           {enablePrePrediction && (
             <button onClick={fetchAIPrediction} disabled={isAIPredicting}
               className={`p-1.5 rounded-lg transition-all border text-xs font-bold ${
@@ -469,7 +519,8 @@ export default function App() {
                     categories={currentData.aspect_category_list} polarities={['positive','negative','neutral']}
                     manualTriplets={manualTriplets}
                     onAddTriplet={t => setManualTriplets(p => [...p, t])}
-                    onRemoveTriplet={id => setManualTriplets(p => p.filter(m => m.id !== id))} />
+                    onRemoveTriplet={id => setManualTriplets(p => p.filter(m => m.id !== id))}
+                    onEditReview={() => setShowEditReview(true)} />
                 </div>
                 {aiSuggestions.length > 0 && (
                   <AISuggestions suggestions={aiSuggestions} onAccept={handleAcceptSuggestion} onReject={handleRejectSuggestion} />
@@ -493,7 +544,8 @@ export default function App() {
                   autoCleanPhrases={settings.auto_clean_phrases}
                   annotations={manualTriplets}
                   onAddAnnotation={t => setManualTriplets(p => [...p, t])}
-                  onRemoveAnnotation={id => setManualTriplets(p => p.filter(m => m.id !== id))} />
+                  onRemoveAnnotation={id => setManualTriplets(p => p.filter(m => m.id !== id))}
+                  onEditReview={() => setShowEditReview(true)} />
               </div>
               {aiSuggestions.length > 0 && (
                 <AISuggestions suggestions={aiSuggestions} onAccept={handleAcceptSuggestion} onReject={handleRejectSuggestion} />
@@ -503,7 +555,7 @@ export default function App() {
         </section>
       </main>
 
-      {showFloatingChat && (
+      {settings.enable_helper_agent && showFloatingChat && (
         <HelperAgentChatbox
           initialReasoning={currentData.agent_initial_reasoning}
           messages={chatMessages}
@@ -513,8 +565,11 @@ export default function App() {
       )}
 
       <footer className="h-10 bg-base-200/90 border-t border-base-300 px-4 flex items-center justify-between flex-shrink-0 z-20">
-        <span className="text-[10px] text-base-content/40 font-mono">
+        <span className="text-[10px] text-base-content/40 font-mono flex items-center gap-2">
           {tripletCount} etiket seçildi · {mode === 'manual' ? 'Manuel' : 'Karşılaştırma'} modu
+          {settings.display_avg_annotation_time && avgAnnotationTime !== null && (
+            <span className="text-base-content/30">· ∅ {avgAnnotationTime.toFixed(1)}sn</span>
+          )}
         </span>
         <div className="flex items-center gap-2">
           <button onClick={() => { setManualTriplets([]); setSelectedModelAIds(new Set()); setSelectedModelBIds(new Set()); }}
@@ -535,6 +590,14 @@ export default function App() {
           onSave={handleSaveSettings}
           onRescanPositions={handleRescanPositions}
           onClose={() => setShowSettings(false)}
+        />
+      )}
+      {showEditReview && (
+        <EditReviewTextModal
+          currentText={currentData.review_text}
+          reviewIndex={currentIndex}
+          onSave={handleUpdateReviewText}
+          onClose={() => setShowEditReview(false)}
         />
       )}
       {saveToast && (

@@ -61,23 +61,23 @@ export const HelperAgentChatbox: React.FC<HelperAgentChatboxProps> = ({
       switch (corner) {
         case 'br':
           nw = Math.max(MIN_W, w + dx);
+          nr = Math.max(0, r - dx);
           nh = Math.max(MIN_H, h + dy);
+          nb = Math.max(0, b - dy);
           break;
         case 'bl':
           nw = Math.max(MIN_W, w - dx);
-          nr = r + (w - Math.max(MIN_W, w - dx));
           nh = Math.max(MIN_H, h + dy);
+          nb = Math.max(0, b - dy);
           break;
         case 'tr':
           nw = Math.max(MIN_W, w + dx);
+          nr = Math.max(0, r - dx);
           nh = Math.max(MIN_H, h - dy);
-          nb = b + (h - Math.max(MIN_H, h - dy));
           break;
         case 'tl':
           nw = Math.max(MIN_W, w - dx);
-          nr = r + (w - Math.max(MIN_W, w - dx));
           nh = Math.max(MIN_H, h - dy);
-          nb = b + (h - Math.max(MIN_H, h - dy));
           break;
       }
 

@@ -100,6 +100,8 @@ def load_config():
         "store_time": False,
         "display_avg_annotation_time": False,
         "enable_pre_prediction": False,
+        "disable_ai_automatic_prediction": False,
+        "enable_helper_agent": True,
         "llm_provider": "ollama",
         "llm_model": "gemma3:4b",
         "openai_key": None,
@@ -186,6 +188,7 @@ def get_settings():
         "display_avg_annotation_time": CONFIG_DATA.get("display_avg_annotation_time", False),
         "enable_pre_prediction": CONFIG_DATA.get("enable_pre_prediction", CONFIG_DATA.get("enable_preprediction", False)),
         "disable_ai_automatic_prediction": CONFIG_DATA.get("disable_ai_automatic_prediction", False),
+        "enable_helper_agent": CONFIG_DATA.get("enable_helper_agent", True),
         "annotation_guideline": CONFIG_DATA.get("annotation_guideline", None),
         "theme": CONFIG_DATA.get("theme", "dark"),
         "llm_provider": CONFIG_DATA.get("llm_provider", "ollama"),
@@ -980,7 +983,24 @@ def save_review_triplets(data_idx: int, req: SaveTripletsRequest):
             triplets_json = json.dumps(triplets_list, ensure_ascii=False)
             df.at[data_idx, "label"] = triplets_json
             save_data(df)
-            
+
+        # If a new review_text was provided, update the data file
+        if req.review_text is not None:
+            if DATA_FILE_TYPE == "json":
+                # JSON: prefer review_text key, fall back to text
+                if "review_text" in data[data_idx]:
+                    data[data_idx]["review_text"] = req.review_text
+                else:
+                    data[data_idx]["text"] = req.review_text
+                save_data(data)
+            else:
+                # CSV: prefer review_text column, fall back to text
+                if "review_text" in df.columns:
+                    df.at[data_idx, "review_text"] = req.review_text
+                else:
+                    df.at[data_idx, "text"] = req.review_text
+                save_data(df)
+
         return {"status": "success", "message": "İnceleme tripletleri başarıyla kaydedildi.", "next_index": data_idx + 1}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

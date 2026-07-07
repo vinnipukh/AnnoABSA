@@ -13,6 +13,7 @@ interface PhraseAnnotatorProps {
   annotations: TripletItem[];
   onAddAnnotation: (triplet: TripletItem) => void;
   onRemoveAnnotation: (id: string) => void;
+  onEditReview?: () => void;
 }
 
 interface PendingAnnotation { start: number; end: number; text: string }
@@ -47,7 +48,7 @@ function getCleanedPositions(os: number, oe: number, txt: string, clean: boolean
 export const PhraseAnnotator: React.FC<PhraseAnnotatorProps> = ({
   reviewText, categories, polarities, clickOnToken,
   implicitAspectAllowed, implicitOpinionAllowed, autoCleanPhrases,
-  annotations, onAddAnnotation, onRemoveAnnotation,
+  annotations, onAddAnnotation, onRemoveAnnotation, onEditReview,
 }) => {
   const [selStart, setSelStart] = useState<number | null>(null);
   const [selEnd, setSelEnd] = useState<number | null>(null);
@@ -87,16 +88,18 @@ export const PhraseAnnotator: React.FC<PhraseAnnotatorProps> = ({
   }, [selStart, selEnd, reviewText, autoCleanPhrases]);
 
   const prevEndRef = React.useRef<number | null>(null);
-  if (pendingFromSelection && pendingFromSelection !== pending && selEnd !== prevEndRef.current) {
-    setPending(pendingFromSelection);
-    setFormAspectTerm(pendingFromSelection.text);
-    setFormOpinionTerm('');
-    setFormCategory(categories[0] || 'RESTAURANT#GENERAL');
-    setFormPolarity('positive');
-    setFormImplicitAspect(false);
-    setFormImplicitOpinion(false);
-    prevEndRef.current = selEnd;
-  }
+  React.useEffect(() => {
+    if (pendingFromSelection && pendingFromSelection !== pending && selEnd !== prevEndRef.current) {
+      setPending(pendingFromSelection);
+      setFormAspectTerm(pendingFromSelection.text);
+      setFormOpinionTerm('');
+      setFormCategory(categories[0] || 'RESTAURANT#GENERAL');
+      setFormPolarity('positive');
+      setFormImplicitAspect(false);
+      setFormImplicitOpinion(false);
+      prevEndRef.current = selEnd;
+    }
+  }, [pendingFromSelection, pending, selEnd, categories]);
 
   const handleCancel = useCallback(() => { setPending(null); setSelStart(null); setSelEnd(null); }, []);
   const handleAdd = useCallback(() => {
@@ -197,6 +200,15 @@ export const PhraseAnnotator: React.FC<PhraseAnnotatorProps> = ({
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-base-300 bg-base-200/60">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-bold text-base-content">Manuel Etiketleme</h3>
+          {onEditReview && (
+            <button onClick={onEditReview}
+              className="p-1 rounded-md bg-base-200 hover:bg-base-300 text-base-content/50 hover:text-primary transition-all border border-base-300"
+              title="Metni Düzenle">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
+          )}
           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-warning/10 text-warning border border-warning/30">
             {clickOnToken ? 'TOKEN' : 'KARAKTER'}
           </span>

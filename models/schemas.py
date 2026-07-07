@@ -4,6 +4,7 @@ from pydantic import BaseModel
 class SaveTripletsRequest(BaseModel):
     """Request model for the primary save endpoint POST /review/{idx}/save."""
     triplets: list
+    review_text: str | None = None
 
 
 class AgentChatRequest(BaseModel):

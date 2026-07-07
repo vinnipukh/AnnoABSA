@@ -67,6 +67,7 @@ export interface Settings {
   display_avg_annotation_time: boolean;
   enable_pre_prediction: boolean;
   disable_ai_automatic_prediction: boolean;
+  enable_helper_agent: boolean;
   llm_provider: string;
   llm_model: string;
   vllm_model: string;

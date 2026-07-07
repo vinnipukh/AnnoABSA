@@ -162,7 +162,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     const initial: FormState = {};
     initial.sentiment_elements = [...(settings.sentiment_elements || ALL_SENTIMENT_ELEMENTS)];
     initial.sentiment_polarity_options = [...(settings.sentiment_polarity_options || POLARITY_OPTIONS)];
-    initial.aspect_categories = [...(settings.aspect_categories || [])];
+    initial.aspect_categories = (settings.aspect_categories || []).join(', ');
     initial.implicit_aspect_term_allowed = settings.implicit_aspect_term_allowed ?? true;
     initial.implicit_opinion_term_allowed = settings.implicit_opinion_term_allowed ?? false;
     initial.click_on_token = settings.click_on_token ?? true;
@@ -170,6 +170,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     initial.auto_clean_phrases = settings.auto_clean_phrases ?? true;
     initial.enable_pre_prediction = settings.enable_pre_prediction ?? false;
     initial.disable_ai_automatic_prediction = settings.disable_ai_automatic_prediction ?? false;
+    initial.enable_helper_agent = settings.enable_helper_agent ?? true;
     initial.llm_provider = settings.llm_provider || 'ollama';
     initial.llm_model = settings.llm_model || 'gemma3:4b';
     initial.vllm_model = settings.vllm_model || '';
@@ -261,6 +262,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 { value: 'dark', label: 'Koyu' },
                 { value: 'coffee', label: 'Kahve' },
                 { value: 'forest', label: 'Orman' },
+                { value: 'cupcake', label: 'Pastel' },
               ]}
             />
           </section>
@@ -287,6 +289,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <div className="space-y-0.5">
               <ToggleRow label="AI önerilerini etkinleştir" key_="enable_pre_prediction" form={form} setForm={setForm} />
               <ToggleRow label="Otomatik AI tahminini devre dışı bırak" key_="disable_ai_automatic_prediction" form={form} setForm={setForm} />
+              <ToggleRow label="Yardımcı Asistanı etkinleştir" key_="enable_helper_agent" form={form} setForm={setForm} />
             </div>
             <SelectRow label="LLM Sağlayıcı" key_="llm_provider" form={form} setForm={setForm}
               options={[
