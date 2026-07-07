@@ -209,11 +209,8 @@ export const PhraseAnnotator: React.FC<PhraseAnnotatorProps> = ({
               </svg>
             </button>
           )}
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-warning/10 text-warning border border-warning/30">
-            {clickOnToken ? 'TOKEN' : 'KARAKTER'}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-base-content/50">
+          </div>
+          <div className="flex items-center gap-2 text-xs text-base-content/50">
           {selStart !== null && (
             <span className="text-primary font-mono text-[10px]">
               {selEnd !== null ? `[${selStart}-${selEnd}]` : `Başlangıç:${selStart} — bitiş için tıkla`}

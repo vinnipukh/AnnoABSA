@@ -1,0 +1,12 @@
+{
+  "name": "annoabsa-root",
+  "version": "1.0.0",
+  "scripts": {
+    "start:backend": "set PYTHONIOENCODING=utf-8 && uvicorn main:app --reload --port 8000",
+    "start:frontend": "cd frontend && npm run dev",
+    "dev": "concurrently -c \"cyan,magenta\" -n \"FASTAPI,REACT\" \"npm run start:backend\" \"npm run start:frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

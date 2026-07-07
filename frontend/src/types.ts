@@ -63,8 +63,6 @@ export interface Settings {
   auto_clean_phrases: boolean;
   save_phrase_positions: boolean;
   click_on_token: boolean;
-  store_time: boolean;
-  display_avg_annotation_time: boolean;
   enable_pre_prediction: boolean;
   disable_ai_automatic_prediction: boolean;
   enable_helper_agent: boolean;

@@ -79,7 +79,6 @@ const DEFAULT_SETTINGS: Settings = {
   aspect_categories: ['RESTAURANT#GENERAL','FOOD#QUALITY','SERVICE#GENERAL','AMBIENCE#GENERAL','FOOD#PRICES','FOOD#STYLE_OPTIONS'],
   implicit_aspect_term_allowed: true, implicit_opinion_term_allowed: false,
   auto_clean_phrases: true, save_phrase_positions: true, click_on_token: true,
-  store_time: false, display_avg_annotation_time: false,
   enable_pre_prediction: false, disable_ai_automatic_prediction: false,
   enable_helper_agent: true,
   llm_provider: 'ollama', llm_model: 'gemma3:4b', vllm_model: '',
@@ -116,8 +115,6 @@ export default function App() {
 
   const backendUrl = import.meta.env?.VITE_BACKEND_URL || 'http://localhost:8000';
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const startTimeRef = useRef<number>(Date.now());
-  const [avgAnnotationTime, setAvgAnnotationTime] = useState<number | null>(null);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -182,8 +179,6 @@ export default function App() {
           auto_clean_phrases: s.auto_clean_phrases ?? true,
           save_phrase_positions: s.save_phrase_positions ?? true,
           click_on_token: s.click_on_token ?? true,
-          store_time: s.store_time ?? false,
-          display_avg_annotation_time: s.display_avg_annotation_time ?? false,
           enable_pre_prediction: s.enable_pre_prediction ?? false,
           disable_ai_automatic_prediction: s.disable_ai_automatic_prediction ?? false,
           enable_helper_agent: s.enable_helper_agent ?? true,
@@ -212,7 +207,6 @@ export default function App() {
 
   useEffect(() => {
     loadReviewRow(currentIndex);
-    startTimeRef.current = Date.now();
   }, [currentIndex]);
 
   const toggleModelA = (id: string) => {
@@ -244,27 +238,6 @@ export default function App() {
         body: JSON.stringify({ triplets: approved }),
       });
     } catch (_) {}
-
-    // Record timing if enabled
-    if (settings.store_time) {
-      const duration = Date.now() - startTimeRef.current;
-      const hadChange = approved.length > 0;
-      try {
-        await fetch(`${backendUrl}/timing/${currentIndex}`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ duration, change: hadChange }),
-        });
-      } catch (_) {}
-    }
-
-    // Refresh average annotation time display if enabled
-    if (settings.display_avg_annotation_time) {
-      try {
-        const res = await fetch(`${backendUrl}/avg-annotation-time`);
-        const data = await res.json();
-        if (data.avg_annotation_time != null) setAvgAnnotationTime(data.avg_annotation_time);
-      } catch (_) {}
-    }
     setSaveToast(`✅ İnceleme #${currentIndex + 1} kaydedildi (${approved.length} etiket).`);
     setTimeout(() => setSaveToast(null), 2500);
     setCurrentIndex(p => (p + 1) % totalCount);
@@ -565,11 +538,8 @@ export default function App() {
       )}
 
       <footer className="h-10 bg-base-200/90 border-t border-base-300 px-4 flex items-center justify-between flex-shrink-0 z-20">
-        <span className="text-[10px] text-base-content/40 font-mono flex items-center gap-2">
+        <span className="text-[10px] text-base-content/40 font-mono">
           {tripletCount} etiket seçildi · {mode === 'manual' ? 'Manuel' : 'Karşılaştırma'} modu
-          {settings.display_avg_annotation_time && avgAnnotationTime !== null && (
-            <span className="text-base-content/30">· ∅ {avgAnnotationTime.toFixed(1)}sn</span>
-          )}
         </span>
         <div className="flex items-center gap-2">
           <button onClick={() => { setManualTriplets([]); setSelectedModelAIds(new Set()); setSelectedModelBIds(new Set()); }}

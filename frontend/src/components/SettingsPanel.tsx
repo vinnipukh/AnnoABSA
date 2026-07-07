@@ -178,8 +178,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     initial.anthropic_key = settings.anthropic_key || '';
     initial.vllm_url = settings.vllm_url || '';
     initial.n_few_shot = settings.n_few_shot ?? 10;
-    initial.store_time = settings.store_time ?? false;
-    initial.display_avg_annotation_time = settings.display_avg_annotation_time ?? false;
     initial.compare_model_a_name = settings.compare_model_a_name || '';
     initial.compare_model_b_name = settings.compare_model_b_name || '';
     initial.theme = settings.theme || 'dark';
@@ -263,6 +261,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 { value: 'coffee', label: 'Kahve' },
                 { value: 'forest', label: 'Orman' },
                 { value: 'cupcake', label: 'Pastel' },
+                { value: 'aqua', label: 'Su' },
+                { value: 'lemonade', label: 'Limonata' },
               ]}
             />
           </section>
@@ -305,14 +305,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <TextRow label="Anthropic Anahtarı" key_="anthropic_key" form={form} setForm={setForm} placeholder="sk-ant-..." type="password" />
             <TextRow label="vLLM URL" key_="vllm_url" form={form} setForm={setForm} placeholder="http://localhost:8001/v1" />
             <NumberRow label="Few-Shot Örnek Sayısı" key_="n_few_shot" form={form} setForm={setForm} min={0} />
-          </section>
-
-          <section>
-            <SectionTitle title="3. Zamanlama" />
-            <div className="space-y-0.5">
-              <ToggleRow label="Zaman verilerini kaydet" key_="store_time" form={form} setForm={setForm} />
-              <ToggleRow label="Ortalama süreyi göster" key_="display_avg_annotation_time" form={form} setForm={setForm} />
-            </div>
           </section>
 
           <section>
