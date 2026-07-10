@@ -11,6 +11,7 @@ from services.llm_providers import (
     PROVIDER_REGISTRY,
     get_provider,
     _derive_provider,
+    validate_provider_config,
     predict_llm,
     OllamaProvider,
     OpenAIProvider,
@@ -138,3 +139,43 @@ class TestPredictLlmWrapper:
         """predict_llm is importable (used by eval.py)."""
         assert callable(predict_llm)
         assert predict_llm.__name__ == "predict_llm"
+
+
+class TestValidateProviderConfig:
+    """Tests for validate_provider_config."""
+
+    def test_ollama_no_validation_needed(self):
+        assert validate_provider_config("ollama", {}) == []
+
+    def test_ollama_with_random_config(self):
+        assert validate_provider_config("ollama", {"openai_key": "sk-x"}) == []
+
+    def test_openai_with_key(self):
+        assert validate_provider_config("openai", {"openai_key": "sk-xxx"}) == []
+
+    def test_openai_without_key(self):
+        errors = validate_provider_config("openai", {})
+        assert len(errors) == 1
+        assert "openai-key" in errors[0]
+
+    def test_anthropic_with_key(self):
+        assert validate_provider_config("anthropic", {"anthropic_key": "sk-ant-xxx"}) == []
+
+    def test_anthropic_without_key(self):
+        errors = validate_provider_config("anthropic", {})
+        assert len(errors) == 1
+        assert "anthropic-key" in errors[0]
+
+    def test_vllm_with_url(self):
+        assert validate_provider_config("vllm", {"vllm_url": "http://localhost:8001/v1"}) == []
+
+    def test_vllm_without_url(self):
+        errors = validate_provider_config("vllm", {})
+        assert len(errors) == 1
+        assert "vllm-url" in errors[0]
+
+    def test_unknown_provider_returns_no_errors(self):
+        assert validate_provider_config("nonexistent", {}) == []
+
+    def test_empty_string_provider(self):
+        assert validate_provider_config("", {}) == []

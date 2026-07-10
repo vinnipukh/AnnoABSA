@@ -778,21 +778,10 @@ def get_ai_prediction(data_idx: int):
             raise HTTPException(status_code=400, detail=str(e))
 
         # Validate provider configuration
-        if provider_name == 'openai' and not config.get('openai_key'):
-            raise HTTPException(
-                status_code=400,
-                detail="OpenAI provider selected but no API key configured. Use --openai-key."
-            )
-        if provider_name == 'anthropic' and not config.get('anthropic_key'):
-            raise HTTPException(
-                status_code=400,
-                detail="Anthropic provider selected but no API key configured. Use --anthropic-key."
-            )
-        if provider_name == 'vllm' and not config.get('vllm_url'):
-            raise HTTPException(
-                status_code=400,
-                detail="vLLM provider selected but no URL configured. Use --vllm-url."
-            )
+        from services.llm_providers import validate_provider_config
+        val_errors = validate_provider_config(provider_name, CONFIG_DATA)
+        if val_errors:
+            raise HTTPException(status_code=400, detail=val_errors[0])
 
         provider = get_provider(provider_name, CONFIG_DATA)
         prompt_template = CONFIG_DATA.get('labeling_prompt_template', DEFAULT_LABELING_TEMPLATE)
@@ -1045,12 +1034,10 @@ def agent_chat(req: AgentChatRequest):
     # Dispatch to configured provider
     try:
         provider_name = _derive_provider(CONFIG_DATA)
-        if provider_name == 'openai' and not config.get('openai_key'):
-            raise ValueError("OpenAI provider selected but no API key configured. Use --openai-key.")
-        if provider_name == 'anthropic' and not config.get('anthropic_key'):
-            raise ValueError("Anthropic provider selected but no API key configured. Use --anthropic-key.")
-        if provider_name == 'vllm' and not config.get('vllm_url'):
-            raise ValueError("vLLM provider selected but no URL configured. Use --vllm-url.")
+        from services.llm_providers import validate_provider_config
+        val_errors = validate_provider_config(provider_name, config)
+        if val_errors:
+            raise ValueError(val_errors[0])
 
         provider = get_provider(provider_name, CONFIG_DATA)
         reply = provider.chat(

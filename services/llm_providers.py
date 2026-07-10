@@ -8,7 +8,9 @@ all adapters implement the same ``predict()`` and ``chat()`` signatures,
 making them interchangeable at the dispatch point.
 
 Import from this module:
-    from services.llm_providers import get_provider, _derive_provider, predict_llm
+    from services.llm_providers import (
+        get_provider, _derive_provider, validate_provider_config, predict_llm,
+    )
 """
 from typing import Protocol, runtime_checkable
 from services.prediction import build_prediction_prompt, build_absa_models
@@ -441,9 +443,9 @@ def _derive_provider(config: dict) -> str:
     3. Multiple of the above are set but no explicit 'llm_provider' → raise ValueError.
     4. None are set → fall back to 'ollama'.
 
-    NOTE: cli.py has an inline copy of this logic that MUST be kept in sync
-    (cannot import from main.py without triggering import-time side effects,
-    same as the template constants in Task 4).
+    NOTE: The validation step (checking that the chosen provider has its required
+    config keys) is handled by ``validate_provider_config()`` in this same module.
+    Call it after ``_derive_provider()`` to ensure the provider can actually run.
     """
     explicit = config.get('llm_provider')
     if explicit:
@@ -488,5 +490,35 @@ def get_provider(provider_name: str, config: dict):
             f"Available: {', '.join(PROVIDER_REGISTRY.keys())}"
         )
     return PROVIDER_REGISTRY[provider_name](config)
+
+
+def validate_provider_config(provider_name: str, config: dict) -> list[str]:
+    """Validate that the given LLM provider has its required config keys.
+
+    Checks provider-specific requirements:
+    - openai → openai_key must be set
+    - anthropic → anthropic_key must be set
+    - vllm → vllm_url must be set
+    - ollama → no required keys (runs locally, no validation needed)
+
+    Returns a list of error messages (empty list = valid).
+    Each caller handles dispatch differently:
+    - cli.py: sys.exit(1) on any error
+    - main.py endpoints: raises HTTPException(400)
+    """
+    errors = []
+    if provider_name == 'openai' and not config.get('openai_key'):
+        errors.append(
+            "OpenAI provider selected but no API key configured. Use --openai-key."
+        )
+    if provider_name == 'anthropic' and not config.get('anthropic_key'):
+        errors.append(
+            "Anthropic provider selected but no API key configured. Use --anthropic-key."
+        )
+    if provider_name == 'vllm' and not config.get('vllm_url'):
+        errors.append(
+            "vLLM provider selected but no URL configured. Use --vllm-url."
+        )
+    return errors
 
 

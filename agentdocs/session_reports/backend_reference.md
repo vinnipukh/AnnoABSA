@@ -110,8 +110,14 @@ Used by `get_provider()` to map provider name → class.
   2. Exactly 1 of `openai_key`/`anthropic_key`/`vllm_url` set → derive to that
   3. Multiple set + no explicit → `ValueError`
   4. None set → `"ollama"`
-- **Called by:** `get_ai_prediction()`, `agent_chat()`.
-- **Note:** `cli.py` has an inline copy that must stay in sync.
+- **Called by:** `get_ai_prediction()`, `agent_chat()`, `cli.py` startup.
+
+#### `validate_provider_config(provider_name: str, config: dict) -> list[str]`
+- **Purpose:** Check that the chosen provider has its required config keys.
+- **Checks:** `openai_key` for openai, `anthropic_key` for anthropic, `vllm_url` for vllm. Ollama has no required keys.
+- **Returns:** Empty list if valid, error message strings otherwise.
+- **Called by:** `get_ai_prediction()`, `agent_chat()`, `cli.py` startup.
+- **Note:** Replaces the triplicated inline validation that previously existed in all three call sites.
 
 #### `get_provider(provider_name: str, config: dict) -> ProviderClass`
 - **Purpose:** Factory — instantiate the right provider adapter.

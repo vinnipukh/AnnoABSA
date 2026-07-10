@@ -201,9 +201,9 @@ Both `get_ai_prediction` and `agent_chat` endpoints dispatch the same way:
    - Multiple set + no explicit → `ValueError`
    - None set → `"ollama"`
 2. `get_provider(name, config)` — looks up `PROVIDER_REGISTRY` and instantiates
-
-`cli.py` has an inline copy of the derivation logic that must stay in sync.
-See `services/llm_providers.py` docstring for details.
+3. `validate_provider_config(name, config)` — checks required keys are set;
+   called by both endpoints and `cli.py` at startup (replaces the triplicated
+   inline validation that previously existed in all three call sites).
 
 ---
 
@@ -245,5 +245,3 @@ See `services/llm_providers.py` docstring for details.
 - **Template constants are duplicated** between `services/prediction.py` and `cli.py`
   (CLI can't import from prediction.py without triggering FastAPI import-time side effects).
   Keep both copies in sync.
-- **`_derive_provider` is duplicated** between `services/llm_providers.py` and `cli.py`
-  (same reason). Keep both copies in sync.

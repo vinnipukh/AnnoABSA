@@ -877,7 +877,7 @@ Examples:
         config.set_n_few_shot(args.n_few_shot)
 
     # LLM provider: use explicit flag, or derive from configured keys
-    from services.llm_providers import _derive_provider
+    from services.llm_providers import _derive_provider, validate_provider_config
     provider_config = {
         "llm_provider": args.llm_provider,
         "openai_key": args.openai_key,
@@ -904,15 +904,10 @@ Examples:
         config.set_vllm_model(args.vllm_model)
 
     # Validate LLM provider has required configuration
-    llm_provider = config.get_config().get("llm_provider")
-    if llm_provider == "openai" and not config.get_config().get("openai_key"):
-        print("❌ Error: LLM provider 'openai' requires --openai-key")
-        sys.exit(1)
-    if llm_provider == "anthropic" and not config.get_config().get("anthropic_key"):
-        print("❌ Error: LLM provider 'anthropic' requires --anthropic-key")
-        sys.exit(1)
-    if llm_provider == "vllm" and not config.get_config().get("vllm_url"):
-        print("❌ Error: LLM provider 'vllm' requires --vllm-url")
+    errors = validate_provider_config(derived, config.get_config())
+    if errors:
+        for err in errors:
+            print(f"❌ Error: {err}")
         sys.exit(1)
 
     if args.compare_model_a_csv:

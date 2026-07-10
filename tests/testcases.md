@@ -99,10 +99,10 @@ pytest tests/
 | File | Tests | What it covers | Correlates to |
 |---|---|---|---|
 | `tests/test_prediction.py` | 38 | `find_phrase_positions`, `find_valid_phrases_list`, `generate_mock_reasoning`, `build_prediction_prompt`, `build_absa_models`, `get_most_similar_examples` | MA3/MA4 position math, H1 fallback, prompt templates |
-| `tests/test_llm_providers.py` | 21 | `_derive_provider` (12 scenarios), `PROVIDER_REGISTRY`, `get_provider` factory, `predict_llm` importable | Task B multi-provider derivation |
+| `tests/test_llm_providers.py` | 31 | `_derive_provider` (12 scenarios), `PROVIDER_REGISTRY`, `get_provider` factory, `predict_llm` importable, `validate_provider_config` (10 scenarios) | Task B multi-provider derivation, provider key validation |
 | `tests/test_main_helpers.py` | 12 | `parse_triplet_column` (STD tuples, lists, dicts, empty/null) | KA7 NULL handling, data loading |
 
-**Total: 71 automated tests** covering backend pure functions.
+**Total: 81 automated tests** covering backend pure functions.
 
 ### What's NOT automated (needs live browser walkthrough)
 
