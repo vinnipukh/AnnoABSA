@@ -73,7 +73,52 @@ This repository is a customized fork of the original AnnoABSA project, adapted f
 
 ## Getting started
 
-### Install dependencies
+### Prerequisites
+
+- **Python 3.11+** — [python.org](https://python.org)
+- **Node.js 18+** — [nodejs.org](https://nodejs.org)
+
+### Quick setup (all platforms)
+
+**Windows:**
+```batch
+setup.bat
+```
+
+**macOS / Linux:**
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+The setup script will:
+1. Create a Python virtual environment
+2. Install Python dependencies (FastAPI, pandas, etc.)
+3. Install frontend dependencies (React, Vite, Tailwind)
+
+### Run the app
+
+**Windows:**
+```batch
+.venv\Scripts\activate
+python cli.py examples/restaurant_reviews.csv
+```
+
+**macOS / Linux:**
+```bash
+source .venv/bin/activate
+python cli.py examples/restaurant_reviews.csv
+```
+
+You can also load a configuration file:
+
+```bash
+python cli.py examples/restaurant_reviews.json --load-config examples/example_config.json
+```
+
+---
+
+## Manual install (if setup scripts don't work)
 
 ```bash
 pip install -r requirements.txt
@@ -82,16 +127,10 @@ npm install
 cd ..
 ```
 
-### Run the app
+Then run with:
 
 ```bash
-./annoabsa examples/restaurant_reviews.csv
-```
-
-You can also load a configuration file:
-
-```bash
-./annoabsa examples/restaurant_reviews.json --load-config examples/example_config.json
+python cli.py examples/restaurant_reviews.csv
 ```
 
 ---
