@@ -1,5 +1,24 @@
 # NLP Helper Toolbar — Kickoff
 
+> **⚠️ SUPERSEDED**
+> This document was the initial planning brief. It has been superseded by three concrete task documents:
+> - [`task1_backend_nlp_helpers.md`](task1_backend_nlp_helpers.md) — backend module + `app/routes/nlp.py` endpoints
+> - [`task2_selection_hook.md`](task2_selection_hook.md) — shared `useTextSelection` hook
+> - [`task3_toolbar_component.md`](task3_toolbar_component.md) — `NlpHelperToolbar.tsx` component
+>
+> All tooling and architecture decisions have changed from this brief. Refer to the task docs above.
+>
+> **Key changes:**
+> | Aspect | This doc recommended | Final decision |
+> |---|---|---|
+> | Morphology | Stanza | NlpToolkit (`FsmMorphologicalAnalyzer`) |
+> | Embeddings | LaBSE (1.8GB) | `multilingual-e5-small` (118MB) |
+> | Sentiment | Lexicon only | Lexicon + BERT classifier (`savasy/bert-base-turkish-sentiment-cased`) |
+> | Endpoint location | Inline in `main.py` | `app/routes/nlp.py` (APIRouter) |
+> | Number of segments | 3 | 4 (added sentence-level sentiment) |
+> | Bag icon | `bag.png` asset | Inline SVG |
+> | Python version | Concerned about 3.13+ | Confirmed working on 3.11 |
+
 New feature, not part of Phase 1. Read fully before planning — several parts involve real
 infra tradeoffs (model downloads, latency, a Python version constraint), not just UI work.
 
