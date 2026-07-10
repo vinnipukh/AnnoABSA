@@ -107,3 +107,4 @@ If you're working via an AI coding agent (like Hermes, Claude Code, or similar):
 - New features should include new tests (add to the appropriate `tests/test_*.py` file).
 - If you change an endpoint or data format: smoke test the UI at `localhost:3000`.
 - No new `# Removed _` comments, no duplicate imports, no German/English mixed docstrings.
+- Any change that does not comply with the instructions given above will not be added to the project and the contributors will be removed from permenantly if they do not abide these instructions.
