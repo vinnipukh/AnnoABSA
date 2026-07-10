@@ -4,7 +4,7 @@ You are helping modify **AnnoABSA**, a web-based annotation tool for Aspect-Base
 Analysis (ABSA), forked/customized for Turkish ABSA research (accepted to LREC 2026).
 
 You have filesystem access to the repo at `C:\Users\arhan\PycharmProjects\AnnoABSA`.
-Read `architecture_map.md` for the module graph, `backend_reference.md` for the full function
+Read `docs/architecture_map.md` for the module graph, `agentdocs/session_reports/backend_reference.md` for the full function
 reference, and `tests/testcases.md` for the regression baseline.
 
 ---
@@ -20,7 +20,7 @@ reference, and `tests/testcases.md` for the regression baseline.
 - **Frontend**: React + TypeScript, Vite, Tailwind (`frontend/src/`).
 - **Data storage**: CSV or JSON, loaded/saved via `load_data()`/`save_data()` in `main.py`.
   File type is auto-detected from extension.
-- **Tests**: pytest in `tests/` (71 tests), manual walkthrough in `tests/testcases.md`.
+- **Tests**: pytest in `tests/` (81 tests), manual walkthrough in `tests/testcases.md`.
 
 ---
 

@@ -1,4 +1,7 @@
 import time, os, json, random, signal, argparse
+import sys
+# Add project root to path so services/ imports work when run from evaluation/
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from services.llm_providers import predict_llm
 
 def timeout_handler(signum, frame):

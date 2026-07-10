@@ -47,7 +47,7 @@ class LLMProviderPort(Protocol):
 def predict_llm(text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms=False, allow_implicit_opinion_terms=False, n_few_shot=10, llm_model="gemma3:4b", prompt_template=None):
     """Predict sentiment elements using Ollama (backward-compatible wrapper).
 
-    Stable compatibility shim for eval.py — delegates to the provider adapter
+    Stable compatibility shim for evaluation/eval.py — delegates to the provider adapter
     pattern. Defaults to Ollama for backward compatibility; accepts an optional
     provider_config dict to route through any configured provider.
 

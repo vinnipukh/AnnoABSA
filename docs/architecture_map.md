@@ -80,7 +80,7 @@ main.py  (residual — ~300 lines)
         get_provider()    — factory: name + config → instance
         _derive_provider() — auto-detect provider from config keys
       Backward compat:
-        predict_llm()     — wraps OllamaProvider, imported by eval.py
+        predict_llm()     — wraps OllamaProvider, imported by evaluation/eval.py
 ```
 
 ### Data flow for a single review, end to end
@@ -224,8 +224,8 @@ Both `get_ai_prediction` and `agent_chat` endpoints dispatch the same way:
 | `frontend/src/components/AISuggestions.tsx` | AI suggestion list with accept/reject | Phase 2 Task 1 |
 | `frontend/src/components/SettingsPanel.tsx` | Settings modal with 5 sections (Annotation, AI/LLM, Timing, Data, Utilities) | Phase 2 Task 2 |
 | `frontend/src/components/HelperAgentChatbox.tsx` | Floating chat panel | Unchanged |
-| `eval.py` | Standalone evaluation script | Imports predict_llm from services/llm_providers |
-| `eval_exc.py` | Multi-process eval launcher | Unchanged |
+| `evaluation/eval.py` | Standalone evaluation script | Imports predict_llm from services/llm_providers |
+| `evaluation/eval_exc.py` | Multi-process eval launcher | Unchanged |
 
 ---
 

@@ -18,13 +18,13 @@ Run these in order after implementing any feature.
 
 ## 3. Run tests
 
-- [ ] `pytest tests/` — all 71 pass (add new tests for the feature if applicable)
+- [ ] `pytest tests/` — all 81 pass (add new tests for the feature if applicable)
 - [ ] If you changed an endpoint or data format: start backend + frontend, load `localhost:3000`, confirm the app still renders without console errors (Tier 1 smoke tests)
 
 ## 4. Update docs
 
 - [ ] **`agentdocs/backend_reference.md`** — if you added/renamed/removed a function, endpoint, or module
-- [ ] **`agentdocs/architecture_map.md`** — if you changed the module graph, added a file, or changed an endpoint contract
+- [ ] **`docs/architecture_map.md`** — if you changed the module graph, added a file, or changed an endpoint contract
 - [ ] **`agentdocs/ProjectPrimer.md`** — if you changed the data format, CLI flags, dependencies, or how-to-run instructions
 - [ ] **`tests/testcases.md`** — if the feature affects behavior that has a dedicated test case (add a new row or update an existing one)
 

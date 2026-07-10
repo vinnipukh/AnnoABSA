@@ -136,7 +136,7 @@ class TestPredictLlmWrapper:
     """Tests for predict_llm backward-compatible wrapper."""
 
     def test_predict_llm_importable(self):
-        """predict_llm is importable (used by eval.py)."""
+        """predict_llm is importable (used by evaluation/eval.py)."""
         assert callable(predict_llm)
         assert predict_llm.__name__ == "predict_llm"
 

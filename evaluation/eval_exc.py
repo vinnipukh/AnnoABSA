@@ -13,7 +13,7 @@ for seed in seeds:
           for mode in modes:
             cmd = [
                 "python",
-                "eval.py",
+                "evaluation/eval.py",
                 "--task", task,
                 "--pool_size", pool_size,
                 "--llm", "gemma3:27b",
