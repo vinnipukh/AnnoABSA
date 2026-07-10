@@ -1,4 +1,4 @@
-"""AnnoABSA FastAPI backend — residual module after root reorganization."""
+"""AnnoABSA FastAPI backend — application, endpoints, and data persistence."""
 import re
 import time
 import numpy as np
@@ -236,9 +236,6 @@ def update_settings(updates: dict):
             status_code=500, detail=f"Error updating settings: {str(e)}")
 
 
-
-
-import ast
 
 def parse_triplet_column(raw_val, prefix="t"):
     """Parse a Python list-literal string into a list of triplet dicts.
@@ -505,7 +502,7 @@ def max_number_of_idxs():
 
 @app.post("/timing/{data_idx}")
 def post_timing(data_idx: int, timing: dict):
-    """Speichere Timing-Informationen für ein Beispiel (append an Liste)."""
+    """Store timing information for a data item (appended to a list)."""
     try:
         data = load_data()
         if data_idx >= len(data) or data_idx < 0:
@@ -925,16 +922,6 @@ async def startup_event():
     print("✨ Backend ready!")
 
 # BM25-based similarity matching (no caching needed)
-
-# Removed _load_embedding_cache function - BM25 doesn't need caching
-
-# Removed _save_embedding_cache function - BM25 doesn't need caching
-
-# Removed _get_sentence_model function - BM25 doesn't need sentence transformers
-
-# Removed _get_cached_embedding function - BM25 doesn't need caching
-
-# Removed _cleanup_embedding_cache function - BM25 doesn't need caching
 
 
 
