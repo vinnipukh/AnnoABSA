@@ -32,6 +32,7 @@ export const HelperAgentChatbox: React.FC<HelperAgentChatboxProps> = ({
 
   const drag = useRef<{ corner: Corner; startX: number; startY: number; r: number; b: number; w: number; h: number } | null>(null);
   const move = useRef<{ startX: number; startY: number; r: number; b: number } | null>(null);
+  const wasDragged = useRef(false);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -98,6 +99,7 @@ export const HelperAgentChatbox: React.FC<HelperAgentChatboxProps> = ({
 
   const startMove = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
+    wasDragged.current = false;
     move.current = { startX: e.clientX, startY: e.clientY, r: right, b: bottom };
     document.body.style.cursor = 'move';
     document.body.style.userSelect = 'none';
@@ -106,6 +108,9 @@ export const HelperAgentChatbox: React.FC<HelperAgentChatboxProps> = ({
       if (!move.current) return;
       const dx = ev.clientX - move.current.startX;
       const dy = ev.clientY - move.current.startY;
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+        wasDragged.current = true;
+      }
       setRight(Math.max(0, move.current.r - dx));
       setBottom(Math.max(0, move.current.b - dy));
     };
@@ -131,9 +136,9 @@ export const HelperAgentChatbox: React.FC<HelperAgentChatboxProps> = ({
 
   if (minimized) {
     return (
-      <div className="fixed z-50" style={{ bottom, right }}>
-        <button onClick={() => setMinimized(false)}
-          className="group flex items-center gap-2 bg-base-100 border border-primary/40 rounded-full px-4 py-3 shadow-2xl hover:border-primary hover:shadow-primary/20 transition-all select-none">
+      <div className="fixed z-50" style={{ bottom, right }} onMouseDown={startMove}>
+        <button onClick={() => { if (wasDragged.current) { wasDragged.current = false; return; } setMinimized(false); }}
+          className="group flex items-center gap-2 bg-base-100 border border-primary/40 rounded-full px-4 py-3 shadow-2xl hover:border-primary hover:shadow-primary/20 transition-all cursor-grab active:cursor-grabbing select-none">
           <div className="relative">
             <span className="text-xl">🤖</span>
             <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-success border-2 border-base-100 rounded-full" />
