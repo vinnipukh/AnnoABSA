@@ -16,7 +16,7 @@ How to use: pick a task, read `CONTRIBUTING.md` for the workflow, then go.
 | 🔴 | Consolidate `pyproject.toml` and `requirements.txt` to one source of truth | Backend | Easy | `pyproject.toml`, `requirements.txt` |
 | 🔴 | Update `.gitignore` — add `uploads/`, `app/`, missing patterns | Backend | Easy | `.gitignore` |
 | 🔴 | Delete `annoabsa` entry-point shim (redundant, README uses `python cli.py`) | Backend | Easy | `annoabsa` file, `README.md` |
-
+- **Logo Color Change**: Logo color does not change when the user's browser theme is dark or light.
 ---
 
 ## Notes
