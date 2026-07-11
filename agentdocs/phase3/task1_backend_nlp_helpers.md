@@ -18,12 +18,12 @@ All loaded **lazily** (first-use only). All wired as endpoints in `main.py`. No 
 
 ## Tool decisions (confirmed)
 
-| Tool | Library | Notes |
-|---|---|---|
-| Word-level lexicon | `nlptoolkit-sentinet` (HisNet) via `SentiNet.SentiNet` + `nlptoolkit-wordnet` | Option B: flatten via WordNet synset iteration → `{word: polarity}` dict |
-| Sentence-level classifier | `savasy/bert-base-turkish-sentiment-cased` | Transformers pipeline |
-| Morphological analysis | `nlptoolkit-morphologicalanalysis` via `FsmMorphologicalAnalyzer` | Per-word analysis (no disambiguation) — local NlpToolkit, not ITU API |
-| Embedding similarity | `intfloat/multilingual-e5-small` via `sentence-transformers` | Cosine similarity between selection and full sentence |
+| Tool | Library (GitHub repo) | pip package | Import path |
+|---|---|---|---|---|
+| Word-level lexicon | [`TurkishSentiNet-Py`](https://github.com/StarlangSoftware/TurkishSentiNet-Py) + [`TurkishWordNet-Py`](https://github.com/StarlangSoftware/TurkishWordNet-Py) | `nlptoolkit-sentinet` + `nlptoolkit-wordnet` | `SentiNet.SentiNet` + `WordNet.WordNet` |
+| Sentence-level classifier | — | `savasy/bert-base-turkish-sentiment-cased` | `transformers.pipeline` |
+| Morphological analysis | [`TurkishMorphologicalAnalysis-Py`](https://github.com/StarlangSoftware/TurkishMorphologicalAnalysis-Py) | `nlptoolkit-morphologicalanalysis` | `MorphologicalAnalysis.FsmMorphologicalAnalyzer` |
+| Embedding similarity | — | `intfloat/multilingual-e5-small` | `sentence_transformers.SentenceTransformer` |
 
 ---
 
@@ -64,7 +64,7 @@ _lexicon_dict = None
 def get_sentinet():
     global _sentinet
     if _sentinet is None:
-        from SentiNet import SentiNet
+        from SentiNet import SentiNet  # from TurkishSentiNet-Py (pip: nlptoolkit-sentinet)
         _sentinet = SentiNet()
     return _sentinet
 
@@ -83,6 +83,7 @@ def get_morphological_analyzer():
     global _morphological_analyzer
     if _morphological_analyzer is None:
         from MorphologicalAnalysis.FsmMorphologicalAnalyzer import FsmMorphologicalAnalyzer
+        # from TurkishMorphologicalAnalysis-Py (pip: nlptoolkit-morphologicalanalysis)
         _morphological_analyzer = FsmMorphologicalAnalyzer()
     return _morphological_analyzer
 
@@ -114,7 +115,7 @@ def _build_flattened_lexicon() -> dict:
     If a word appears in multiple synsets with different polarities,
     average the scores and pick the dominant polarity label.
     """
-    from WordNet import WordNet
+    from WordNet import WordNet  # from TurkishWordNet-Py (pip: nlptoolkit-wordnet)
     sentinet = get_sentinet()
     wn = WordNet()
     lexicon = {}
@@ -150,7 +151,7 @@ def _build_flattened_lexicon() -> dict:
     return lexicon
 ```
 
-> **Note:** The exact API (`WordNet.getSynSetList()`, `SynSet.getId()`, `SynSet.getSynonym()`, `Literal.getName()`) depends on the `nlptoolkit-wordnet` version installed. Adjust during implementation — verify with one synset first.
+> **Note:** The exact API (`WordNet.getSynSetList()`, `SynSet.getId()`, `SynSet.getSynonym()`, `Literal.getName()`) depends on the installed version of [`TurkishWordNet-Py`](https://github.com/StarlangSoftware/TurkishWordNet-Py) (pip: `nlptoolkit-wordnet`). Adjust during implementation — verify with one synset first.
 
 **→ verify: `python -c "from services.nlp_helpers import get_lexicon; l = get_lexicon(); print(f'Lexicon entries: {len(l)}'); print(l.get('güzel'), l.get('kötü'))"` shows entries for known Turkish words**
 
@@ -353,14 +354,17 @@ Submodules:
 
 Add to both files:
 ```
-nlptoolkit-sentinet
-nlptoolkit-morphologicalanalysis
-nlptoolkit-wordnet
-nlptoolkit-dictionary
+# StarlangSoftware NLP Toolkit — pip package names (GitHub repos in parens)
+nlptoolkit-sentinet                           # TurkishSentiNet-Py
+nlptoolkit-wordnet                            # TurkishWordNet-Py
+nlptoolkit-dictionary                         # Dictionary-Py (dependency of wordnet & morphology)
+nlptoolkit-morphologicalanalysis              # TurkishMorphologicalAnalysis-Py
+# HuggingFace / ML deps
 sentence-transformers
 transformers
 torch
-setuptools<75       # pinned: newer setuptools removed pkg_resources that NlpToolkit needs
+# Pinned: newer setuptools removed pkg_resources that Starlang packages need
+setuptools<75
 ```
 
 **→ verify: `uv pip install` in project root succeeds, no conflicts**
@@ -539,7 +543,7 @@ def test_morphology_analyzer_error(mock_get_analyzer):
 
 | Step | Action | Expected result |
 |---|---|---|
-| 1 | `uv pip install nlptoolkit-sentinet nlptoolkit-morphologicalanalysis nlptoolkit-wordnet nlptoolkit-dictionary sentence-transformers transformers torch 'setuptools<75'` | All install without errors |
+| 1 | `uv pip install nlptoolkit-sentinet nlptoolkit-morphologicalanalysis nlptoolkit-wordnet nlptoolkit-dictionary sentence-transformers transformers torch 'setuptools<75'` | All install without errors. (These pip packages map to: [`TurkishSentiNet-Py`](https://github.com/StarlangSoftware/TurkishSentiNet-Py), [`TurkishMorphologicalAnalysis-Py`](https://github.com/StarlangSoftware/TurkishMorphologicalAnalysis-Py), [`TurkishWordNet-Py`](https://github.com/StarlangSoftware/TurkishWordNet-Py), [`Dictionary-Py`](https://github.com/StarlangSoftware/Dictionary-Py)) |
 | 2 | `python -c "from SentiNet import SentiNet; sn = SentiNet(); print(f'SentiNet: {len(sn.getPositives())} positives')"` | Shows count > 0 (no import error) |
 | 3 | `python -c "from MorphologicalAnalysis.FsmMorphologicalAnalyzer import FsmMorphologicalAnalyzer; ma = FsmMorphologicalAnalyzer(); r = ma.morphologicalAnalysis('güzel'); print(f'Parses: {r.size()}')"` | Prints "Parses: 1" or more |
 | 4 | Create `services/nlp_helpers.py` with all lazy-loading functions | File parses without error |

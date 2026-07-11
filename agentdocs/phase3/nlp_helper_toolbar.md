@@ -11,7 +11,7 @@
 > **Key changes:**
 > | Aspect | This doc recommended | Final decision |
 > |---|---|---|
-> | Morphology | Stanza | NlpToolkit (`FsmMorphologicalAnalyzer`) |
+> | Morphology | Stanza | [`TurkishMorphologicalAnalysis-Py`](https://github.com/StarlangSoftware/TurkishMorphologicalAnalysis-Py) |
 > | Embeddings | LaBSE (1.8GB) | `multilingual-e5-small` (118MB) |
 > | Sentiment | Lexicon only | Lexicon + BERT classifier (`savasy/bert-base-turkish-sentiment-cased`) |
 > | Endpoint location | Inline in `main.py` | `app/routes/nlp.py` (APIRouter) |
