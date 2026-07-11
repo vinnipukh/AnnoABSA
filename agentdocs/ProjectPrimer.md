@@ -22,7 +22,7 @@ reference, and `tests/testcases.md` for the regression baseline.
 - **Frontend**: React + TypeScript, Vite, Tailwind (`frontend/src/`).
 - **Data storage**: CSV or JSON, loaded/saved via `load_data()`/`save_data()` in `main.py`.
   File type is auto-detected from extension.
-- **Tests**: pytest in `tests/` (81 tests), manual walkthrough in `tests/testcases.md`.
+- **Tests**: pytest in `tests/` (93 tests), manual walkthrough in `tests/testcases.md`.
 
 ---
 
@@ -145,7 +145,7 @@ uvicorn main:app --port=8000
 ### Running tests
 
 ```bash
-pytest tests/          # 71 automated tests
+pytest tests/          # 93 automated tests
 ```
 
 Manual walkthrough: `tests/testcases.md` requires a running backend + frontend + browser.

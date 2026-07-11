@@ -31,16 +31,16 @@ is no live IPC, no shared process, no re-invocation of `cli.py` logic from insid
 
 ## 2. Backend module graph (post-reorganization)
 
-The backend was split from one monolithic `main.py` (~1750 lines) into four modules:
+The backend was split from one monolithic `main.py` (~1750 lines) into six modules:
 
 ```
-main.py  (residual — ~300 lines)
+main.py  (residual — ~1053 lines)
 │  Global state: DATA_FILE_PATH, DATA_FILE_TYPE, CONFIG_PATH, CONFIG_DATA, AUTO_POSITIONS
 │  Data I/O: load_data(), save_data(), set_data_file(), set_config_file()
 │  Config: load_config(), set_config()
 │  Helper methods: get_total_count(), get_current_index(), max_number_of_idxs()
 │  Position logic: auto_add_missing_positions()
-│  Endpoints (13 total, all still registered here):
+│  Endpoints (10 in main.py, 4 in nlp router = 14 total):
 │    GET  /settings
 │    PATCH /settings
 │    GET  /data/{data_idx}
@@ -53,13 +53,25 @@ main.py  (residual — ~300 lines)
 │    POST /agent/chat
 │  Startup: startup_event()
 │
+├── services/nlp_helpers.py
+│    4 lazy-loaded NLP tools (first-use only, zero startup cost):
+│      get_sentinet()               — SentiNet lexicon from StarlangSoftware
+│      get_sentiment_classifier()   — BERT Turkish sentiment pipeline
+│      get_morphological_analyzer() — NlpToolkit FsmMorphologicalAnalyzer
+│      get_embedding_model()        — multilingual-e5-small SentenceTransformer
+│      get_lexicon()                — flattened {word: (polarity, score)} dict via WordNet
+│    Handlers:
+│      lexicon_polarity(text)       — per-word + aggregate polarity
+│      sentiment_classify(text)     — BERT label + confidence
+│      morphology(word)             — root, POS, inflectional groups
+│      embedding_similarity(sel, sent) — cosine similarity (0.0–1.0)
+│
 ├── app/routes/nlp.py     (APIRouter, first production route file)
-│    4 NLP Helper Toolbar endpoints:
+│    4 NLP Helper Toolbar endpoints (lazy imports from services/nlp_helpers):
 │      GET /nlp/lexicon-polarity      — SentiNet per-word sentiment
 │      GET /nlp/sentiment             — BERT sentence-level sentiment
 │      GET /nlp/morphology            — NlpToolkit morphological analysis
 │      GET /nlp/embedding-similarity  — e5-small cosine similarity
-│     All lazy-loaded (no model imports at server startup)
 │
 ├── models/schemas.py
 │     Pydantic models shared across endpoints:
@@ -145,19 +157,30 @@ App.tsx  (single top-level component, owns ALL state — no state management lib
 │     with checkboxes for selection/deselection
 │
 ├─ components/ManualInputForm.tsx
-│     props: text/onSubmit-style form callbacks — dropdown+text entry for manual triplets
-│     Used in Compare mode center column
+│     props: text/onSubmit callbacks, manual triplet entry. Now has clickable
+│     character-level spans via useTextSelection hook (shared with PhraseAnnotator).
+│     Also exposes onSelectionChange for NLP toolbar. Used in Compare mode center column.
 │
 ├─ components/PhraseAnnotator.tsx
 │     Click-to-select span annotator for Manual mode. Character-level rendering,
-│     inline color highlighting, popup form for category/polarity, position math
+│     inline color highlighting, popup form for category/polarity, position math.
+│     Selection logic extracted into shared useTextSelection hook.
+│
+├─ components/NlpHelperToolbar.tsx
+│     Collapsible floating toolbar: bag icon (collapsed) → 4-segment card (expanded).
+│     Segments: Sözlük (lexicon, auto-fetches), Duygu Analizi / Yapı / Benzerlik
+│     (on-demand). Escape/click-outside to collapse. Mounted in App.tsx for both modes.
 │
 ├─ components/HelperAgentChatbox.tsx
 │     props: chat messages, send handler — floating panel, talks to POST /agent/chat
 │
 ├─ components/CustomCheckbox.tsx        — generic, no app-specific logic
-├─ components/DarkModeToggle.tsx        — generic, pairs with hooks/useDarkMode.ts
-├─ hooks/useDarkMode.ts
+├─ components/AISuggestions.tsx         — AI suggestion list with accept/reject
+├─ components/SettingsPanel.tsx         — Settings modal, 5 sections
+├─ hooks/useTextSelection.ts            — shared character-level selection hook
+│     Pure functions: getTokenBounds, cleanPhrase, getCleanedPositions
+│     Hook: 3-state click machine (start → end → reset), returns [state, actions]
+├─ hooks/useDarkMode.ts                 — dark/light theme toggle
 ├─ phraseColoring.tsx                    — polarity→color mapping (25-color palette)
 └─ types.ts                              — TripletItem, ReviewComparisonData, ChatMessage
       ReviewComparisonData.model_a_triplets / model_b_triplets
@@ -217,21 +240,25 @@ Both `get_ai_prediction` and `agent_chat` endpoints dispatch the same way:
 
 ## 5. File-to-task map
 
-| File(s) | What lives there | Phase 1 task |
-|---|---|---|
-| `main.py` | Global state, data I/O, config functions, all 13 HTTP endpoints, startup event | Residual / Phase 2 Task 2 (PATCH /settings) |
+| File(s) | What lives there | Task |
+|---|---|---|---|
+| `main.py` | Global state, data I/O, config functions, 10 HTTP endpoints, startup event | Residual / Phase 2 Task 2 |
 | `models/schemas.py` | SaveTripletsRequest, AgentChatRequest | Step 2 of root reorg |
 | `services/prediction.py` | Templates, prompt builders, BM25 retrieval, position helpers | Step 4 of root reorg |
 | `services/llm_providers.py` | 4 provider adapter classes, registry, factory, _derive_provider, predict_llm | Task 3 + Step 3 of root reorg |
+| `services/nlp_helpers.py` | 4 lazy-loaded NLP tools + 4 handler functions | Phase 3 Task 1 (new) |
+| `app/routes/nlp.py` | APIRouter with 4 NLP endpoints (first production route file) | Phase 3 Task 1 (new) |
 | `cli.py` | Argparse, config management, start_backend/start_frontend, STD format conversion | Tasks 1, 3, 4 |
-| `frontend/src/App.tsx` | Top-level layout, mode toggle, chat toggle, state management | Tasks 2, 5 |
+| `frontend/src/App.tsx` | Top-level layout, mode toggle, chat toggle, NLP toolbar state, state management | Tasks 2, 5 + P3T1 |
 | `frontend/src/types.ts` | TripletItem, ReviewComparisonData with model_a/b naming | Task 2 |
-| `frontend/src/components/PhraseAnnotator.tsx` | Click-to-select span annotator | Task 5 (new file) |
+| `frontend/src/components/PhraseAnnotator.tsx` | Click-to-select span annotator (uses useTextSelection hook) | Task 5 + Phase 3 Task 1 |
+| `frontend/src/components/ManualInputForm.tsx` | Clickable text + manual triplet form (uses useTextSelection hook) | Phase 3 Task 1 (reworked) |
 | `frontend/src/components/ModelTripletColumn.tsx` | Generic comparison column | Task 2 (consumer only) |
-| `frontend/src/components/ManualInputForm.tsx` | Dropdown-based manual triplet entry | Unchanged |
+| `frontend/src/components/NlpHelperToolbar.tsx` | Collapsible toolbar: bag icon, 4 segments, auto/on-demand fetches | Phase 3 Task 1 (new) |
 | `frontend/src/components/AISuggestions.tsx` | AI suggestion list with accept/reject | Phase 2 Task 1 |
-| `frontend/src/components/SettingsPanel.tsx` | Settings modal with 5 sections (Annotation, AI/LLM, Timing, Data, Utilities) | Phase 2 Task 2 |
+| `frontend/src/components/SettingsPanel.tsx` | Settings modal with 5 sections | Phase 2 Task 2 |
 | `frontend/src/components/HelperAgentChatbox.tsx` | Floating chat panel | Unchanged |
+| `frontend/src/hooks/useTextSelection.ts` | Shared character-level selection hook | Phase 3 Task 1 (new) |
 | `evaluation/eval.py` | Standalone evaluation script | Imports predict_llm from services/llm_providers |
 | `evaluation/eval_exc.py` | Multi-process eval launcher | Unchanged |
 
@@ -246,6 +273,9 @@ Both `get_ai_prediction` and `agent_chat` endpoints dispatch the same way:
 - **`set_data_file()` is NOT dead code** — called by the `upload_data` endpoint.
 - **`'NULL'` is a literal string sentinel for implicit aspects/opinions**, checked via
   `!= 'NULL'` in `auto_add_missing_positions`. Never convert it to `""`.
+- **NlpToolkit packages need `setuptools<75`** — the StarlangSoftware packages
+  (`nlptoolkit-sentinet`, etc.) use `pkg_resources` at import time, removed in
+  setuptools 75+. Install with `pip install 'setuptools<75'` before installing them.
 - **BM25 tokenization has no Turkish stemming** — plain `\b\w+\b` regex + lowercase.
   Don't assume more few-shot examples will help without fixing this first.
 - **`aspect_category`/`sentiment_polarity` values stay in English** — confirmed user decision,
