@@ -32,12 +32,13 @@ export const PhraseAnnotator: React.FC<PhraseAnnotatorProps> = ({
   annotations, onAddAnnotation, onRemoveAnnotation, onEditReview,
   onSelectionChange,
 }) => {
-  const [{ selStart, selEnd, pendingSelection }, { handleCharClick, clearSelection }] = useTextSelection(
+  const [{ selStart, selEnd, pendingSelection }, { handleMouseUp, clearSelection }] = useTextSelection(
     reviewText,
     { clickOnToken, autoCleanPhrases }
   );
 
   const [pending, setPending] = useState<PendingAnnotation | null>(null);
+  const textContainerRef = useRef<HTMLDivElement>(null);
   const [formAspectTerm, setFormAspectTerm] = useState('');
   const [formOpinionTerm, setFormOpinionTerm] = useState('');
   const [formCategory, setFormCategory] = useState(categories[0] || 'RESTAURANT#GENERAL');
@@ -131,13 +132,6 @@ export const PhraseAnnotator: React.FC<PhraseAnnotatorProps> = ({
         }
       }
     });
-    if (selStart !== null) {
-      const effE = selEnd ?? selStart;
-      for (let i = selStart; i <= effE && i < n; i++) {
-        bg[i] = 'rgba(59,130,246,0.4)';
-        cls[i] = (cls[i]||'') + ' ring-1 ring-primary/60';
-      }
-    }
 
     const runs: { start: number; end: number; bg: string | null; cls: string }[] = [];
     let i = 0;
@@ -152,14 +146,13 @@ export const PhraseAnnotator: React.FC<PhraseAnnotatorProps> = ({
     return runs.map((r) => (
       <span
         key={r.start}
-        onClick={() => handleCharClick(r.start)}
-        className={`cursor-pointer select-none rounded-sm ${r.bg ? r.cls : 'hover:bg-primary/20'}`}
+        className={`cursor-pointer rounded-sm ${r.bg ? r.cls : 'hover:bg-primary/20'}`}
         style={r.bg ? { backgroundColor: r.bg } : undefined}
       >
         {reviewText.slice(r.start, r.end + 1)}
       </span>
     ));
-  }, [reviewText, annotations, selStart, selEnd, handleCharClick]);
+  }, [reviewText, annotations]);
 
   const getSentimentBadge = (pol: string) => {
     const p = pol.toLowerCase();
@@ -200,10 +193,12 @@ export const PhraseAnnotator: React.FC<PhraseAnnotatorProps> = ({
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-bold text-base-content/50 uppercase tracking-wider flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-              Metinden seçmek için tıkla (1. tık başlangıç, 2. tık bitiş)
+              Metinden seçmek için sürükle
             </span>
           </div>
-          <div className="text-base md:text-lg font-medium text-base-content leading-relaxed font-sans select-none whitespace-pre-wrap">
+          <div ref={textContainerRef}
+            className="text-base md:text-lg font-medium text-base-content leading-relaxed font-sans whitespace-pre-wrap"
+            onMouseUp={() => { if (textContainerRef.current) handleMouseUp(textContainerRef.current); }}>
             {renderedRuns || reviewText}
           </div>
         </div>

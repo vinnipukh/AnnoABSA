@@ -32,7 +32,7 @@ export const ManualInputForm: React.FC<ManualInputFormProps> = ({
   const [sentiment, setSentiment] = useState('positive');
   const [showTranslation, setShowTranslation] = useState(false);
 
-  const [{ selStart, selEnd }, { handleCharClick }] = useTextSelection(
+  const [{ selStart, selEnd }, { handleMouseUp }] = useTextSelection(
     reviewText,
     { clickOnToken, autoCleanPhrases: true }
   );
@@ -56,20 +56,12 @@ export const ManualInputForm: React.FC<ManualInputFormProps> = ({
     }
   }, [selStart, selEnd, reviewText, onSelectionChange]);
 
-  // Build character-level selection-highlighted runs
+  // Build character-level runs for annotation coloring (selection is native)
   const renderedRuns = useMemo(() => {
     if (!reviewText) return null;
     const n = reviewText.length;
     const bg: (string | null)[] = new Array(n).fill(null);
     const cls: string[] = new Array(n).fill('');
-
-    if (selStart !== null) {
-      const effE = selEnd ?? selStart;
-      for (let i = selStart; i <= effE && i < n; i++) {
-        bg[i] = 'rgba(59,130,246,0.4)';
-        cls[i] = 'ring-1 ring-primary/60';
-      }
-    }
 
     const runs: { start: number; end: number; bg: string | null; cls: string }[] = [];
     let i = 0;
@@ -84,14 +76,13 @@ export const ManualInputForm: React.FC<ManualInputFormProps> = ({
     return runs.map((r) => (
       <span
         key={r.start}
-        onClick={() => handleCharClick(r.start)}
-        className={`cursor-pointer select-none rounded-sm ${r.bg ? r.cls : 'hover:bg-primary/20'}`}
+        className={`cursor-pointer rounded-sm ${r.bg ? r.cls : 'hover:bg-primary/20'}`}
         style={r.bg ? { backgroundColor: r.bg } : undefined}
       >
         {reviewText.slice(r.start, r.end + 1)}
       </span>
     ));
-  }, [reviewText, selStart, selEnd, handleCharClick]);
+  }, [reviewText]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,7 +136,8 @@ export const ManualInputForm: React.FC<ManualInputFormProps> = ({
           </div>
         </div>
 
-        <div ref={textContainerRef} className="text-lg md:text-xl font-medium text-base-content leading-relaxed font-sans select-none whitespace-pre-wrap">
+        <div ref={textContainerRef} className="text-lg md:text-xl font-medium text-base-content leading-relaxed font-sans whitespace-pre-wrap"
+          onMouseUp={() => { if (textContainerRef.current) handleMouseUp(textContainerRef.current); }}>
           {renderedRuns || (showTranslation && translation ? translation : reviewText || "Metin bulunamadı.")}
         </div>
       </div>

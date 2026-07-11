@@ -2,7 +2,7 @@
 
 > **⚠️ SUPERSEDED**
 > This document was the initial planning brief. It has been superseded by three concrete task documents:
-> - [`task1_backend_nlp_helpers.md`](task1_backend_nlp_helpers.md) — backend module + `app/routes/nlp.py` endpoints
+> - [`task1_backend_nlp_helpers.md`](task1/task1_backend_nlp_helpers.md) — backend module + `app/routes/nlp.py` endpoints
 > - [`task2_selection_hook.md`](task2_selection_hook.md) — shared `useTextSelection` hook
 > - [`task3_toolbar_component.md`](task3_toolbar_component.md) — `NlpHelperToolbar.tsx` component
 >

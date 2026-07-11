@@ -39,8 +39,24 @@ export interface TextSelectionState {
 }
 
 export interface TextSelectionActions {
-  handleCharClick: (charIndex: number) => void;
+  handleMouseUp: (container: HTMLElement) => void;
   clearSelection: () => void;
+}
+
+/* ── Helpers ──────────────────────────────────────────────────────────── */
+
+/**
+ * Walk text nodes inside `container` and find the full-text character offset
+ * corresponding to the boundary of a native browser Range.
+ *
+ * Uses Range-based position calculation which works correctly even when the
+ * text is split across multiple <span> elements (annotation highlighting).
+ */
+function getCharOffset(container: HTMLElement, refNode: Node, refOffset: number): number {
+  const r = document.createRange();
+  r.selectNodeContents(container);
+  r.setEnd(refNode, refOffset);
+  return r.toString().length;
 }
 
 /* ── Hook ─────────────────────────────────────────────────────────────── */
@@ -51,10 +67,11 @@ interface UseTextSelectionOptions {
 }
 
 /**
- * Character-level text selection hook.
+ * Character-level text selection hook using native browser selection.
  *
- * Click cycle: first click sets start, second click sets end,
- * third click resets. Supports token snapping and phrase cleaning.
+ * Works like standard desktop text selection: click-drag-release selects text.
+ * On mouseup reads `window.getSelection()` and computes character offsets
+ * via DOM Range walking. Supports token snapping and phrase cleaning.
  */
 export function useTextSelection(
   reviewText: string,
@@ -65,42 +82,59 @@ export function useTextSelection(
   const [selStart, setSelStart] = useState<number | null>(null);
   const [selEnd, setSelEnd] = useState<number | null>(null);
 
-  const handleCharClick = useCallback((charIndex: number) => {
-    let start = charIndex, end = charIndex;
-    if (clickOnToken) {
-      const tb = getTokenBounds(reviewText, charIndex);
-      if (selStart === null) start = tb.start;
-      else end = tb.end;
-    }
-    if (selStart === null) {
-      setSelStart(start);
-    } else if (selEnd === null && (clickOnToken ? end : charIndex) >= selStart) {
-      setSelEnd(clickOnToken ? end : charIndex);
-    } else {
-      setSelStart(start);
+  const handleMouseUp = useCallback((container: HTMLElement) => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) {
+      setSelStart(null);
       setSelEnd(null);
+      return;
     }
-  }, [reviewText, clickOnToken, selStart, selEnd]);
+
+    const range = sel.getRangeAt(0);
+    const rawStart = getCharOffset(container, range.startContainer, range.startOffset);
+    const rawEnd = getCharOffset(container, range.endContainer, range.endOffset);
+
+    // Range guarantees start ≤ end, so rawEnd > rawStart means non-empty
+    if (rawEnd <= rawStart) {
+      setSelStart(null);
+      setSelEnd(null);
+      return;
+    }
+
+    let s = rawStart, e = rawEnd - 1;  // convert to 0-indexed inclusive
+    if (clickOnToken) {
+      const st = getTokenBounds(reviewText, s);
+      const et = getTokenBounds(reviewText, e);
+      s = st.start;
+      e = et.end;
+    }
+    setSelStart(s);
+    setSelEnd(e);
+  }, [reviewText, clickOnToken]);
 
   const clearSelection = useCallback(() => {
     setSelStart(null);
     setSelEnd(null);
+    window.getSelection()?.removeAllRanges();
   }, []);
 
   const pendingSelection = useMemo((): PendingSelection | null => {
     if (selStart === null || selEnd === null) return null;
-    let s = selStart, e = selEnd, t = reviewText.substring(s, e + 1);
+    const s = Math.min(selStart, selEnd);
+    const e = Math.max(selStart, selEnd);
     if (autoCleanPhrases) {
       const cp = getCleanedPositions(s, e, reviewText, true);
-      s = cp.start; e = cp.end; t = reviewText.substring(s, e + 1);
+      const text = reviewText.substring(cp.start, cp.end + 1);
+      return text.trim() ? { start: cp.start, end: cp.end, text } : null;
     }
-    return t.trim() ? { start: s, end: e, text: t } : null;
+    const text = reviewText.substring(s, e + 1);
+    return text.trim() ? { start: s, end: e, text } : null;
   }, [selStart, selEnd, reviewText, autoCleanPhrases]);
 
   const selectedText = pendingSelection ? pendingSelection.text : '';
 
   const state: TextSelectionState = { selStart, selEnd, selectedText, pendingSelection };
-  const actions: TextSelectionActions = { handleCharClick, clearSelection };
+  const actions: TextSelectionActions = { handleMouseUp, clearSelection };
 
   return [state, actions];
 }

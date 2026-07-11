@@ -167,9 +167,14 @@ App.tsx  (single top-level component, owns ALL state — no state management lib
 │     Selection logic extracted into shared useTextSelection hook.
 │
 ├─ components/NlpHelperToolbar.tsx
-│     Collapsible floating toolbar: bag icon (collapsed) → 4-segment card (expanded).
+│     Collapsible floating toolbox: red toolbox icon (collapsed) → 4-segment card (expanded).
+│     Positioned fixed at bottom-center above the footer (not anchored to selection).
 │     Segments: Sözlük (lexicon, auto-fetches), Duygu Analizi / Yapı / Benzerlik
 │     (on-demand). Escape/click-outside to collapse. Mounted in App.tsx for both modes.
+│
+├─ components/NlpHelperToolbar.test.tsx
+│     14 vitest tests: collapse/expand, auto-fetch lexicon, on-demand segments,
+│     error handling, Escape key, abort-on-unmount.
 │
 ├─ components/HelperAgentChatbox.tsx
 │     props: chat messages, send handler — floating panel, talks to POST /agent/chat
@@ -177,18 +182,20 @@ App.tsx  (single top-level component, owns ALL state — no state management lib
 ├─ components/CustomCheckbox.tsx        — generic, no app-specific logic
 ├─ components/AISuggestions.tsx         — AI suggestion list with accept/reject
 ├─ components/SettingsPanel.tsx         — Settings modal, 5 sections
-├─ hooks/useTextSelection.ts            — shared character-level selection hook
+├─ hooks/useTextSelection.ts            — shared native-drag selection hook
 │     Pure functions: getTokenBounds, cleanPhrase, getCleanedPositions
-│     Hook: 3-state click machine (start → end → reset), returns [state, actions]
+│     Hook: reads window.getSelection() on mouseup, computes char offsets
+│     via DOM Range walking. Returns [state, actions]
 ├─ hooks/useDarkMode.ts                 — dark/light theme toggle
 ├─ phraseColoring.tsx                    — polarity→color mapping (25-color palette)
 └─ types.ts                              — TripletItem, ReviewComparisonData, ChatMessage
       ReviewComparisonData.model_a_triplets / model_b_triplets
 ```
 
-**Key fact**: There's a two-click interaction pattern for span selection. First click sets
-`selStart`, second click sets `selEnd`. In `click_on_token` mode, selection snaps to word
-boundaries via `getTokenBounds()`. Runs are grouped by continuous background color — no
+**Key fact**: Selection uses native browser drag-to-select (mousedown → drag → mouseup).
+The hook reads `window.getSelection()` on mouseup and computes character offsets
+via DOM Range walking. Token snapping via `getTokenBounds()` expands to word
+boundaries. Runs are grouped by continuous background color — no
 per-character borders.
 
 ---
@@ -254,11 +261,13 @@ Both `get_ai_prediction` and `agent_chat` endpoints dispatch the same way:
 | `frontend/src/components/PhraseAnnotator.tsx` | Click-to-select span annotator (uses useTextSelection hook) | Task 5 + Phase 3 Task 1 |
 | `frontend/src/components/ManualInputForm.tsx` | Clickable text + manual triplet form (uses useTextSelection hook) | Phase 3 Task 1 (reworked) |
 | `frontend/src/components/ModelTripletColumn.tsx` | Generic comparison column | Task 2 (consumer only) |
-| `frontend/src/components/NlpHelperToolbar.tsx` | Collapsible toolbar: bag icon, 4 segments, auto/on-demand fetches | Phase 3 Task 1 (new) |
+| `frontend/src/components/NlpHelperToolbar.tsx` | Collapsible floating toolbox: red toolbox icon, 4 segments, auto/on-demand fetches | Phase 3 Task 3 |
+| `frontend/src/components/NlpHelperToolbar.test.tsx` | 14 vitest tests for toolbar component | Phase 3 Task 3 |
 | `frontend/src/components/AISuggestions.tsx` | AI suggestion list with accept/reject | Phase 2 Task 1 |
 | `frontend/src/components/SettingsPanel.tsx` | Settings modal with 5 sections | Phase 2 Task 2 |
 | `frontend/src/components/HelperAgentChatbox.tsx` | Floating chat panel | Unchanged |
-| `frontend/src/hooks/useTextSelection.ts` | Shared character-level selection hook | Phase 3 Task 1 (new) |
+| `frontend/src/hooks/useTextSelection.ts` | Shared native-drag selection hook | Phase 3 Task 2 |
+| `frontend/src/hooks/useTextSelection.test.ts` | 13 vitest tests for pure functions | Phase 3 Task 2 |
 | `evaluation/eval.py` | Standalone evaluation script | Imports predict_llm from services/llm_providers |
 | `evaluation/eval_exc.py` | Multi-process eval launcher | Unchanged |
 

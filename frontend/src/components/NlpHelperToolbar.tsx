@@ -11,7 +11,6 @@ interface SegmentResult {
 interface NlpHelperToolbarProps {
   selectedText: string;
   sentenceText?: string;
-  anchorRect?: DOMRect | null;
   onClose?: () => void;
 }
 
@@ -118,13 +117,20 @@ function SegmentButton({ emoji, label, loading, data, error, onClick }: SegmentB
   );
 }
 
-/* ── Bag icon SVG ───────────────────────────────────────────────────── */
+/* ── Toolbox icon SVG (always red, ignores theme) ────────────────────── */
 
-function BagIcon() {
+function ToolboxIcon() {
   return (
-    <svg className="w-5 h-5 text-base-content/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+    <svg className="w-5 h-5" fill="none" stroke="#DC2626" viewBox="0 0 24 24" strokeWidth={1.8}
+      strokeLinecap="round" strokeLinejoin="round">
+      {/* Handle */}
+      <rect x="5" y="3" width="14" height="3" rx="1" fill="#DC2626" />
+      {/* Body */}
+      <path d="M2 8h20l-1.5 13H3.5L2 8z" fill="#DC2626" />
+      {/* Divider lines */}
+      <line x1="8" y1="8" x2="8" y2="21" stroke="white" strokeWidth={0.5} />
+      <line x1="12" y1="8" x2="12" y2="21" stroke="white" strokeWidth={0.5} />
+      <line x1="16" y1="8" x2="16" y2="21" stroke="white" strokeWidth={0.5} />
     </svg>
   );
 }
@@ -134,7 +140,6 @@ function BagIcon() {
 export const NlpHelperToolbar: React.FC<NlpHelperToolbarProps> = ({
   selectedText,
   sentenceText,
-  anchorRect,
   onClose,
 }) => {
   const [expanded, setExpanded] = useState(false);
@@ -194,16 +199,16 @@ export const NlpHelperToolbar: React.FC<NlpHelperToolbarProps> = ({
     };
   }, [expanded, onClose]);
 
-  // Position
+  // Position: centered horizontally above the footer
   const toolbarStyle: React.CSSProperties = useMemo(() => {
-    if (!anchorRect) return { position: 'fixed', bottom: '60px', left: '16px', zIndex: 45 };
     return {
       position: 'fixed',
-      top: `${anchorRect.bottom + 8}px`,
-      left: `${Math.min(anchorRect.left, window.innerWidth - 380)}px`,
+      bottom: '64px',
+      left: '50%',
+      transform: 'translateX(-50%)',
       zIndex: 45,
     };
-  }, [anchorRect]);
+  }, []);
 
   // Cleanup abort on unmount
   useEffect(() => {
@@ -222,7 +227,7 @@ export const NlpHelperToolbar: React.FC<NlpHelperToolbarProps> = ({
       {!expanded ? (
         <button onClick={() => setExpanded(true)}
           className="p-2 hover:bg-base-200 rounded-xl transition-colors" title="NLP Araçları">
-          <BagIcon />
+          <ToolboxIcon />
         </button>
       ) : (
         <div className="p-2 space-y-1">

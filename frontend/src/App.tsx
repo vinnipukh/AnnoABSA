@@ -116,7 +116,7 @@ export default function App() {
 
   // NLP Toolbar state
   const [nlpToolbarSelection, setNlpToolbarSelection] = useState<{
-    text: string; sentence: string; rect?: DOMRect
+    text: string; sentence: string
   } | null>(null);
 
   const backendUrl = import.meta.env?.VITE_BACKEND_URL || 'http://localhost:8000';
@@ -599,7 +599,6 @@ export default function App() {
         <NlpHelperToolbar
           selectedText={nlpToolbarSelection.text}
           sentenceText={nlpToolbarSelection.sentence}
-          anchorRect={nlpToolbarSelection.rect}
           onClose={() => setNlpToolbarSelection(null)}
         />
       )}
