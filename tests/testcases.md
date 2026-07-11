@@ -88,9 +88,36 @@ Updated to cover both automated (pytest) and manual (browser) tests after root r
 
 ---
 
+### Tier 7 — NLP Helper Toolbar Backend
+
+| ID | Test | Expected | Verdict |
+|---|---|---|---|
+| NLB1 | `GET /nlp/lexicon-polarity?text=güzel` returns known word | Polarity for "güzel" is "positive" | ✓ |
+| NLB2 | `GET /nlp/lexicon-polarity?text=xyzzy` returns unknown word | polarity="unknown", aggregate="neutral" | ✓ (test) |
+| NLB3 | `GET /nlp/sentiment?text=Harika` with positive text | label="positive", score > 0.7 | — (needs model download) |
+| NLB4 | `GET /nlp/sentiment?text=Berbat` with negative text | label="negative", score > 0.7 | — (needs model download) |
+| NLB5 | `GET /nlp/morphology?word=güzel` | Returns at least 1 parse with root + POS | ✓ |
+| NLB6 | `GET /nlp/embedding-similarity` with identical selection+sentence | similarity=1.0 | ✓ (test) |
+| NLB7 | Lazy loading: no model import at startup | Server logs contain none of: "SentiNet", "pipeline", "FsmMorphological", "SentenceTransformer" | ✓ |
+| NLB8 | All 4 endpoints return HTTP 500 on internal error | Each wraps exceptions properly | ✓ (test) |
+| NLB9 | Router registration in main.py | `from app.routes.nlp import router` + `app.include_router(nlp_router)` | ✓ |
+
+### Tier 7B — NLP Helper Toolbar Frontend
+
+| ID | Test | Expected | Verdict |
+|---|---|---|---|
+| NF1 | Toolbar bag icon visible after text selection in Manuel mode | Small icon appears near selection | — (browser) |
+| NF2 | Toolbar bag icon visible after text selection in Karşılaştır mode | Small icon appears near selection | — (browser) |
+| NF3 | Click bag icon → toolbar expands | 4 segments visible; lexicon shows result immediately | — (browser) |
+| NF4 | Click "Duygu Analizi" segment | Loading spinner → positive/negative label + confidence | — (browser, needs model) |
+| NF5 | Click "Yapı Çözümleme" segment | Root word + POS + inflectional groups shown | — (browser) |
+| NF6 | Click "Benzerlik Karşılaştırması" segment | Similarity score shown as percentage | — (browser, needs model) |
+| NF7 | Escape key collapses toolbar | Toolbar disappears, text selection preserved | — (browser) |
+| NF8 | Click outside toolbar collapses it | Same as Escape | — (browser) |
+
 ## Automated Tests (pytest)
 
-After root reorganization, the following pure-logic tests live in `tests/` and can be run with:
+After root reorganization, the following pure-logic tests live in `tests/`:
 
 ```bash
 pytest tests/
@@ -101,8 +128,9 @@ pytest tests/
 | `tests/test_prediction.py` | 38 | `find_phrase_positions`, `find_valid_phrases_list`, `generate_mock_reasoning`, `build_prediction_prompt`, `build_absa_models`, `get_most_similar_examples` | MA3/MA4 position math, H1 fallback, prompt templates |
 | `tests/test_llm_providers.py` | 31 | `_derive_provider` (12 scenarios), `PROVIDER_REGISTRY`, `get_provider` factory, `predict_llm` importable, `validate_provider_config` (10 scenarios) | Task B multi-provider derivation, provider key validation |
 | `tests/test_main_helpers.py` | 12 | `parse_triplet_column` (STD tuples, lists, dicts, empty/null) | KA7 NULL handling, data loading |
+| `tests/test_nlp_helpers.py` | 12 | `lexicon_polarity`, `sentiment_classify`, `morphology`, `embedding_similarity` (all mocked) | NLB1–NLB8 handler logic |
 
-**Total: 81 automated tests** covering backend pure functions.
+**Total: 93 automated tests** covering backend pure functions.
 
 ### What's NOT automated (needs live browser walkthrough)
 

@@ -24,6 +24,7 @@ from services.prediction import (
 from services.llm_providers import (
     get_provider, _derive_provider, PROVIDER_REGISTRY,
 )
+from app.routes.nlp import router as nlp_router
 import ast
 
 app = FastAPI()
@@ -154,6 +155,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(nlp_router)
 
 
 

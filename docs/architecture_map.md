@@ -53,6 +53,14 @@ main.py  (residual — ~300 lines)
 │    POST /agent/chat
 │  Startup: startup_event()
 │
+├── app/routes/nlp.py     (APIRouter, first production route file)
+│    4 NLP Helper Toolbar endpoints:
+│      GET /nlp/lexicon-polarity      — SentiNet per-word sentiment
+│      GET /nlp/sentiment             — BERT sentence-level sentiment
+│      GET /nlp/morphology            — NlpToolkit morphological analysis
+│      GET /nlp/embedding-similarity  — e5-small cosine similarity
+│     All lazy-loaded (no model imports at server startup)
+│
 ├── models/schemas.py
 │     Pydantic models shared across endpoints:
 │       SaveTripletsRequest  — used by POST /review/{idx}/save

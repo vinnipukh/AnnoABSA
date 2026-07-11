@@ -4,14 +4,16 @@
 **Purpose:** FastAPI backend for AnnoABSA. Serves annotation data, manages CSV/JSON persistence,
 dispatches LLM predictions via pluggable provider adapters, and handles the Helper Agent chat endpoint.
 
-After root reorganization, the backend spans four files:
+After root reorganization, the backend spans six files:
 
 | File | Lines | Purpose |
 |---|---|---|
-| `main.py` | ~1053 | Global state, data I/O, all 13 HTTP endpoints, startup |
+| `main.py` | ~1053 | Global state, data I/O, most HTTP endpoints, startup |
 | `models/schemas.py` | ~12 | Pydantic request models |
 | `services/prediction.py` | ~357 | Prompt building, BM25 retrieval, position logic, template constants |
 | `services/llm_providers.py` | ~502 | LLM provider adapters, registry, factory, dispatch |
+| `services/nlp_helpers.py` | ~280 | NLP Helper Toolbar: 4 lazy-loaded tools (SentiNet, BERT, NlpToolkit, e5-small) |
+| `app/routes/nlp.py` | ~70 | APIRouter for 4 NLP endpoints (lexicon-polarity, sentiment, morphology, embedding-similarity) |
 
 ---
 
@@ -215,7 +217,7 @@ Used by `get_provider()` to map provider name → class.
 
 ---
 
-## main.py — FastAPI Endpoints
+## main.py — FastAPI Endpoints (10)
 
 | Method | Path | Handler | Purpose |
 |---|---|---|---|---|
@@ -229,6 +231,17 @@ Used by `get_provider()` to map provider name → class.
 | POST | `/review/{data_idx}/save` | `save_review_triplets()` | **PRIMARY save** — called by `handleNextReview` in both modes |
 | GET | `/ai_prediction/{data_idx}` | `get_ai_prediction()` | Generate AI predictions via configured LLM provider |
 | POST | `/agent/chat` | `agent_chat()` | Handle Helper Agent chat messages |
+
+## app/routes/nlp.py — NLP Helper Toolbar Endpoints (4)
+
+| Method | Path | Handler | Purpose |
+|---|---|---|---|
+| GET | `/nlp/lexicon-polarity` | `get_lexicon_polarity()` | Per-word sentiment lookup via SentiNet lexicon |
+| GET | `/nlp/sentiment` | `get_sentiment()` | Sentence-level sentiment classification via BERT |
+| GET | `/nlp/morphology` | `get_morphology()` | Morphological analysis via NlpToolkit |
+| GET | `/nlp/embedding-similarity` | `get_embedding_similarity()` | Cosine similarity between selection and full sentence via e5-small |
+
+All four endpoints use lazy imports — models load on first request, not at server startup.
 
 ---
 

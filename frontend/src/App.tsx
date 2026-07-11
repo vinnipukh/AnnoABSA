@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TripletItem, ReviewComparisonData, ChatMessage, Settings } from './types';
 import { ModelTripletColumn } from './components/ModelTripletColumn';
 import { ManualInputForm } from './components/ManualInputForm';
@@ -7,6 +7,7 @@ import { PhraseAnnotator } from './components/PhraseAnnotator';
 import { AISuggestions, AiSuggestionItem } from './components/AISuggestions';
 import { SettingsPanel } from './components/SettingsPanel';
 import { EditReviewTextModal } from './components/EditReviewTextModal';
+import { NlpHelperToolbar } from './components/NlpHelperToolbar';
 
 const FALLBACK_DATA: ReviewComparisonData[] = [
   {
@@ -112,6 +113,11 @@ export default function App() {
   const [enablePrePrediction, setEnablePrePrediction] = useState(false);
   const [disableAiAutomaticPrediction, setDisableAiAutomaticPrediction] = useState(false);
   const aiAbortRef = useRef<AbortController | null>(null);
+
+  // NLP Toolbar state
+  const [nlpToolbarSelection, setNlpToolbarSelection] = useState<{
+    text: string; sentence: string; rect?: DOMRect
+  } | null>(null);
 
   const backendUrl = import.meta.env?.VITE_BACKEND_URL || 'http://localhost:8000';
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -381,6 +387,15 @@ export default function App() {
     }
   };
 
+  // NLP Toolbar selection callback
+  const handleNlpSelectionChange = useCallback((text: string, rect?: DOMRect) => {
+    if (text) {
+      setNlpToolbarSelection({ text, sentence: currentData.review_text, rect });
+    } else {
+      setNlpToolbarSelection(null);
+    }
+  }, [currentData.review_text]);
+
   const handleUpdateReviewText = async (newText: string) => {
     try {
       const res = await fetch(`${backendUrl}/review/${currentIndex}/save`, {
@@ -493,7 +508,9 @@ export default function App() {
                     manualTriplets={manualTriplets}
                     onAddTriplet={t => setManualTriplets(p => [...p, t])}
                     onRemoveTriplet={id => setManualTriplets(p => p.filter(m => m.id !== id))}
-                    onEditReview={() => setShowEditReview(true)} />
+                    onEditReview={() => setShowEditReview(true)}
+                    clickOnToken={settings.click_on_token}
+                    onSelectionChange={handleNlpSelectionChange} />
                 </div>
                 {aiSuggestions.length > 0 && (
                   <AISuggestions suggestions={aiSuggestions} onAccept={handleAcceptSuggestion} onReject={handleRejectSuggestion} />
@@ -518,7 +535,8 @@ export default function App() {
                   annotations={manualTriplets}
                   onAddAnnotation={t => setManualTriplets(p => [...p, t])}
                   onRemoveAnnotation={id => setManualTriplets(p => p.filter(m => m.id !== id))}
-                  onEditReview={() => setShowEditReview(true)} />
+                  onEditReview={() => setShowEditReview(true)}
+                  onSelectionChange={handleNlpSelectionChange} />
               </div>
               {aiSuggestions.length > 0 && (
                 <AISuggestions suggestions={aiSuggestions} onAccept={handleAcceptSuggestion} onReject={handleRejectSuggestion} />
@@ -574,6 +592,16 @@ export default function App() {
         <div className="fixed bottom-14 left-1/2 -translate-x-1/2 bg-base-100 border border-success/50 text-success px-4 py-2 rounded-xl shadow-2xl z-50 flex items-center text-xs font-semibold backdrop-blur-md">
           {saveToast}
         </div>
+      )}
+
+      {/* NLP Helper Toolbar */}
+      {nlpToolbarSelection && (
+        <NlpHelperToolbar
+          selectedText={nlpToolbarSelection.text}
+          sentenceText={nlpToolbarSelection.sentence}
+          anchorRect={nlpToolbarSelection.rect}
+          onClose={() => setNlpToolbarSelection(null)}
+        />
       )}
     </div>
   );

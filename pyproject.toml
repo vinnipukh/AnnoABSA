@@ -10,4 +10,13 @@ dependencies = [
     "openai",
     "ollama",
     "anthropic",
+    "python-multipart",
+    "nlptoolkit-sentinet",
+    "nlptoolkit-wordnet",
+    "nlptoolkit-dictionary",
+    "nlptoolkit-morphologicalanalysis",
+    "sentence-transformers",
+    "transformers",
+    "torch",
+    "setuptools<75",
 ]

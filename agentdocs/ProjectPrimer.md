@@ -12,9 +12,11 @@ reference, and `tests/testcases.md` for the regression baseline.
 ## Stack
 
 - **Backend**: Python (3.11), FastAPI, pandas, rank-bm25, ollama, openai, anthropic.
-  - `main.py` (~1053 lines) — global state, data I/O, all 13 HTTP endpoints, startup.
+  - `main.py` (~1053 lines) — global state, data I/O, all 10 HTTP endpoints, startup.
   - `services/prediction.py` — prompt building, BM25 retrieval, position helpers, template constants.
   - `services/llm_providers.py` — 4 provider adapters (OllamaProvider, OpenAIProvider, AnthropicProvider, VLLMProvider) + registry + dispatch.
+  - `services/nlp_helpers.py` — NLP Helper Toolbar: 4 lazy-loaded tools (SentiNet, BERT, NlpToolkit, e5-small).
+  - `app/routes/nlp.py` — APIRouter with 4 NLP endpoints (lexicon-polarity, sentiment, morphology, embedding-similarity).
   - `models/schemas.py` — Pydantic models (SaveTripletsRequest, AgentChatRequest).
   - `cli.py` — argparse-based launcher, starts backend + frontend as subprocesses.
 - **Frontend**: React + TypeScript, Vite, Tailwind (`frontend/src/`).

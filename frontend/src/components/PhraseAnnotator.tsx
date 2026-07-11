@@ -1,6 +1,7 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { TripletItem } from '../types';
 import { getColorByIndex } from '../phraseColoring';
+import { useTextSelection, getCleanedPositions } from '../hooks/useTextSelection';
 
 interface PhraseAnnotatorProps {
   reviewText: string;
@@ -14,6 +15,7 @@ interface PhraseAnnotatorProps {
   onAddAnnotation: (triplet: TripletItem) => void;
   onRemoveAnnotation: (id: string) => void;
   onEditReview?: () => void;
+  onSelectionChange?: (text: string, rect?: DOMRect) => void;
 }
 
 interface PendingAnnotation { start: number; end: number; text: string }
@@ -24,34 +26,17 @@ const SENTIMENT_STYLES: Record<string, { border: string; bg: string; text: strin
   neutral:  { border: 'border-warning/60', bg: 'bg-warning/15', text: 'text-warning', ring: 'ring-warning/40' },
 };
 
-function getTokenBounds(text: string, ci: number): { start: number; end: number } {
-  if (!text || ci < 0 || ci >= text.length) return { start: ci, end: ci };
-  const isB = (c: string) => /[\s.,;:!?¡¿"''`'''""„«»()\[\]{}]+/.test(c);
-  let s = ci, e = ci;
-  while (s > 0 && !isB(text[s - 1])) s--;
-  while (e < text.length - 1 && !isB(text[e + 1])) e++;
-  return { start: s, end: e };
-}
-
-function cleanPhrase(p: string): string {
-  return p.replace(/^[.,;:!?¡¿"''`'''""„«»()\[\]{}]+|[.,;:!?¡¿"''`'''""„«»()\[\]{}]+$/g, '').trim();
-}
-
-function getCleanedPositions(os: number, oe: number, txt: string, clean: boolean): { start: number; end: number } {
-  if (!clean) return { start: os, end: oe };
-  const r = txt.substring(os, oe + 1), c = cleanPhrase(r);
-  if (c === r) return { start: os, end: oe };
-  const i = r.indexOf(c);
-  return i === -1 ? { start: os, end: oe } : { start: os + i, end: os + i + c.length - 1 };
-}
-
 export const PhraseAnnotator: React.FC<PhraseAnnotatorProps> = ({
   reviewText, categories, polarities, clickOnToken,
   implicitAspectAllowed, implicitOpinionAllowed, autoCleanPhrases,
   annotations, onAddAnnotation, onRemoveAnnotation, onEditReview,
+  onSelectionChange,
 }) => {
-  const [selStart, setSelStart] = useState<number | null>(null);
-  const [selEnd, setSelEnd] = useState<number | null>(null);
+  const [{ selStart, selEnd, pendingSelection }, { handleCharClick, clearSelection }] = useTextSelection(
+    reviewText,
+    { clickOnToken, autoCleanPhrases }
+  );
+
   const [pending, setPending] = useState<PendingAnnotation | null>(null);
   const [formAspectTerm, setFormAspectTerm] = useState('');
   const [formOpinionTerm, setFormOpinionTerm] = useState('');
@@ -60,38 +45,12 @@ export const PhraseAnnotator: React.FC<PhraseAnnotatorProps> = ({
   const [formImplicitAspect, setFormImplicitAspect] = useState(false);
   const [formImplicitOpinion, setFormImplicitOpinion] = useState(false);
 
-  const handleCharClick = useCallback((charIndex: number) => {
-    let start = charIndex, end = charIndex;
-    if (clickOnToken) {
-      const tb = getTokenBounds(reviewText, charIndex);
-      if (selStart === null) start = tb.start;
-      else end = tb.end;
-    }
-    if (selStart === null) {
-      setSelStart(start);
-    } else if (selEnd === null && (clickOnToken ? end : charIndex) >= selStart) {
-      setSelEnd(clickOnToken ? end : charIndex);
-    } else {
-      setSelStart(start);
-      setSelEnd(null);
-    }
-  }, [reviewText, clickOnToken, selStart, selEnd]);
-
-  const pendingFromSelection = useMemo((): PendingAnnotation | null => {
-    if (selStart === null || selEnd === null) return null;
-    let s = selStart, e = selEnd, t = reviewText.substring(s, e + 1);
-    if (autoCleanPhrases) {
-      const cp = getCleanedPositions(s, e, reviewText, true);
-      s = cp.start; e = cp.end; t = reviewText.substring(s, e + 1);
-    }
-    return t.trim() ? { start: s, end: e, text: t } : null;
-  }, [selStart, selEnd, reviewText, autoCleanPhrases]);
-
-  const prevEndRef = React.useRef<number | null>(null);
-  React.useEffect(() => {
-    if (pendingFromSelection && pendingFromSelection !== pending && selEnd !== prevEndRef.current) {
-      setPending(pendingFromSelection);
-      setFormAspectTerm(pendingFromSelection.text);
+  // Bridge: hook's pendingSelection → component's form state
+  const prevEndRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (pendingSelection && selEnd !== prevEndRef.current) {
+      setPending(pendingSelection);
+      setFormAspectTerm(pendingSelection.text);
       setFormOpinionTerm('');
       setFormCategory(categories[0] || 'RESTAURANT#GENERAL');
       setFormPolarity('positive');
@@ -99,9 +58,25 @@ export const PhraseAnnotator: React.FC<PhraseAnnotatorProps> = ({
       setFormImplicitOpinion(false);
       prevEndRef.current = selEnd;
     }
-  }, [pendingFromSelection, pending, selEnd, categories]);
+  }, [pendingSelection, selEnd, categories]);
 
-  const handleCancel = useCallback(() => { setPending(null); setSelStart(null); setSelEnd(null); }, []);
+  // Notify parent of selection changes (for NLP toolbar)
+  useEffect(() => {
+    if (onSelectionChange) {
+      if (selStart !== null && selEnd !== null && pendingSelection) {
+        const sel = window.getSelection();
+        let rect: DOMRect | undefined;
+        if (sel && sel.rangeCount > 0) {
+          rect = sel.getRangeAt(0).getBoundingClientRect();
+        }
+        onSelectionChange(pendingSelection.text, rect);
+      } else {
+        onSelectionChange('');
+      }
+    }
+  }, [selStart, selEnd, pendingSelection, onSelectionChange]);
+
+  const handleCancel = useCallback(() => { setPending(null); clearSelection(); }, [clearSelection]);
   const handleAdd = useCallback(() => {
     if (!pending) return;
     const aT = formImplicitAspect ? 'NULL' : formAspectTerm.trim() || 'NULL';
@@ -113,7 +88,7 @@ export const PhraseAnnotator: React.FC<PhraseAnnotatorProps> = ({
       ann.aspect_category === formCategory
     );
     if (isDuplicate) {
-      setPending(null); setSelStart(null); setSelEnd(null);
+      setPending(null); clearSelection();
       return;
     }
 
@@ -132,8 +107,8 @@ export const PhraseAnnotator: React.FC<PhraseAnnotatorProps> = ({
       else { triplet.ot_start = null; triplet.ot_end = null; }
     } else { triplet.ot_start = null; triplet.ot_end = null; }
     onAddAnnotation(triplet);
-    setPending(null); setSelStart(null); setSelEnd(null);
-  }, [pending, formImplicitAspect, formAspectTerm, formImplicitOpinion, formOpinionTerm, formCategory, formPolarity, reviewText, autoCleanPhrases, onAddAnnotation]);
+    setPending(null); clearSelection();
+  }, [pending, formImplicitAspect, formAspectTerm, formImplicitOpinion, formOpinionTerm, formCategory, formPolarity, reviewText, autoCleanPhrases, onAddAnnotation, clearSelection]);
 
   const renderedRuns = useMemo(() => {
     if (!reviewText) return null;
