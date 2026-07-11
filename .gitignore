@@ -46,6 +46,9 @@ evaluation/predictions_random/
 evaluation/performance_plot.pdf
 evaluation/performance_latex/
 
+# ── Package manager lock files (uv generates this on every install) ──
+uv.lock
+
 # ── Agent / tooling ──────────────────────────
 .agentbridge/
 guidelines.pdf
