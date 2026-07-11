@@ -1,11 +1,11 @@
 # AnnoABSA — Regression Test Cases
 
-**Status:** Baseline captured 2026-07-03 against running app.
+**Status:** Baseline captured 2026-07-11 (updated for Phase 3: drag selection + NLP toolbox).
 **Test dataset:** `examples/semeval_reviews.csv` (5 Turkish restaurant reviews).
 **Backend:** `uvicorn main:app --port=8000 --host=localhost` with `ABSA_DATA_PATH=examples/semeval_reviews.csv`
 **Frontend:** `npm run dev -- --port 3000` in `frontend/`
 
-Updated to cover both automated (pytest) and manual (browser) tests after root reorganization.
+Covers automated (pytest + vitest) and manual (browser) test cases.
 
 ---
 
@@ -25,7 +25,7 @@ Updated to cover both automated (pytest) and manual (browser) tests after root r
 
 | ID | Test | Expected | Verdict |
 |---|---|---|---|
-| MA1 | Click once (start), click again (end) on review text | Solid highlighted span via token snapping, no per-character gaps | ✓ code + run |
+| MA1 | Drag-select on review text (mousedown → drag → mouseup) | Native browser blue highlight, token snapping via `getTokenBounds()` | ✓ code |
 | MA2 | Form opens after span selection | Popup with aspect term pre-filled from selected text | ✓ code + run |
 | MA3 | Save a triplet | Counter increments, annotation listed, text highlighted | ✓ code + run |
 | MA4 | Add multiple triplets | Each gets distinct color, all remain listed and highlighted; duplicate (same span + same category) silently skipped | ✓ code + run |
@@ -44,6 +44,17 @@ Updated to cover both automated (pytest) and manual (browser) tests after root r
 | KA6 | Add manual triplet while in Compare mode | Appears under "Eklenen Özel Tripletler", NOT in Model A/B columns | ✓ code |
 | KA7 | Triplet with `"NULL"` aspect term | Renders as `"NULL"` (quoted), still selectable | ✓ code |
 | KA8 | Footer count (`X etiket seçildi`) | Compare: `A.size + B.size + manual.length`; Manual: `manual.length` | ✓ code |
+
+### Tier 2C — Text Selection (native drag)
+
+| ID | Test | Expected | Verdict |
+|---|---|---|---|
+| TS1 | Karşılaştır mode: drag-select on review text | Native blue highlight follows cursor | — |
+| TS2 | Karşılaştır mode: release mouse after drag | Selection finalized, NLP toolbox red icon appears at bottom-center | — |
+| TS3 | Single click (no drag) on a word | Selects the full token (token snapping) | — |
+| TS4 | Selection clears on row navigation | New row has no active selection | — |
+| TS5 | Drag selection in Karşılaştır mode does NOT toggle model checkboxes | Checkbox state unchanged | — |
+| TS6 | Select text, switch mode to Manuel, switch back | Selection resets (expected — mode change re-renders) | — |
 
 ### Tier 3 — Persistence (in-memory frontend state, not DB)
 
@@ -106,41 +117,57 @@ Updated to cover both automated (pytest) and manual (browser) tests after root r
 
 | ID | Test | Expected | Verdict |
 |---|---|---|---|
-| NF1 | Toolbar bag icon visible after text selection in Manuel mode | Small icon appears near selection | — (browser) |
-| NF2 | Toolbar bag icon visible after text selection in Karşılaştır mode | Small icon appears near selection | — (browser) |
-| NF3 | Click bag icon → toolbar expands | 4 segments visible; lexicon shows result immediately | — (browser) |
+| NF1 | Red toolbox icon visible after text selection in Manuel mode | Red toolbox SVG appears at bottom-center of screen | — (browser) |
+| NF2 | Red toolbox icon visible after text selection in Karşılaştır mode | Red toolbox SVG appears at bottom-center of screen | — (browser) |
+| NF3 | Click toolbox icon → toolbar expands | 4 segments visible; Sözlük shows lexicon result immediately | — (browser) |
 | NF4 | Click "Duygu Analizi" segment | Loading spinner → positive/negative label + confidence | — (browser, needs model) |
 | NF5 | Click "Yapı Çözümleme" segment | Root word + POS + inflectional groups shown | — (browser) |
 | NF6 | Click "Benzerlik Karşılaştırması" segment | Similarity score shown as percentage | — (browser, needs model) |
 | NF7 | Escape key collapses toolbar | Toolbar disappears, text selection preserved | — (browser) |
 | NF8 | Click outside toolbar collapses it | Same as Escape | — (browser) |
 
-## Automated Tests (pytest)
+### Tier 8 — NLP Toolbar Unit Tests (vitest)
 
-After root reorganization, the following pure-logic tests live in `tests/`:
+| ID | Test | Expected | Verdict |
+|---|---|---|---|
+| VT1 | 14 toolbar component tests | All pass: collapse/expand, auto-fetch, on-demand, errors, Escape, abort | ✓ (27 total) |
+
+---
+
+## Automated Tests
 
 ```bash
-pytest tests/
+pytest tests/        # 93 backend tests
+cd frontend && npx vitest run   # 27 frontend tests
 ```
+
+### Backend (pytest — 93 tests)
 
 | File | Tests | What it covers | Correlates to |
 |---|---|---|---|
 | `tests/test_prediction.py` | 38 | `find_phrase_positions`, `find_valid_phrases_list`, `generate_mock_reasoning`, `build_prediction_prompt`, `build_absa_models`, `get_most_similar_examples` | MA3/MA4 position math, H1 fallback, prompt templates |
-| `tests/test_llm_providers.py` | 31 | `_derive_provider` (12 scenarios), `PROVIDER_REGISTRY`, `get_provider` factory, `predict_llm` importable, `validate_provider_config` (10 scenarios) | Task B multi-provider derivation, provider key validation |
+| `tests/test_llm_providers.py` | 31 | `_derive_provider` (12 scenarios), `PROVIDER_REGISTRY`, `get_provider` factory, `predict_llm` importable, `validate_provider_config` (10 scenarios) | Provider derivation, key validation |
 | `tests/test_main_helpers.py` | 12 | `parse_triplet_column` (STD tuples, lists, dicts, empty/null) | KA7 NULL handling, data loading |
 | `tests/test_nlp_helpers.py` | 12 | `lexicon_polarity`, `sentiment_classify`, `morphology`, `embedding_similarity` (all mocked) | NLB1–NLB8 handler logic |
 
-**Total: 93 automated tests** covering backend pure functions.
+### Frontend (vitest — 27 tests)
+
+| File | Tests | What it covers |
+|---|---|---|
+| `frontend/src/hooks/useTextSelection.test.ts` | 13 | `getTokenBounds` (5), `cleanPhrase` (5), `getCleanedPositions` (3) |
+| `frontend/src/components/NlpHelperToolbar.test.tsx` | 14 | Collapse/expand, auto-fetch lexicon, on-demand segments, error handling, Escape key, abort-on-unmount |
 
 ### What's NOT automated (needs live browser walkthrough)
 
 - S1–S4: Page load, mode toggle, overlap, row counter rendering
-- MA1–MA5: Span selection, popup appearance, save, highlighting
+- MA1–MA5: Drag selection, popup appearance, save, highlighting
+- TS1–TS6: Native drag selection in Compare mode, token snapping, row reset
 - KA1, KA6: Column rendering, manual form integration
 - P1–P5: Mode-switch persistence, chat persistence, row re-navigation
 - N1–N6: All navigation buttons
 - H1–H6: Chat interactions, auto-scroll
 - U1–U4: Visual polish
+- NF1–NF8: NLP toolbox visual interaction (icon, expand, segments, collapse)
 
 These require a running backend + frontend and a browser.
 
@@ -186,14 +213,14 @@ Elements present:
 **Action:** `curl http://localhost:8000/settings`
 **Result:** HTTP 200, JSON with `total_count: 5`.
 
-### MA1 — Click-to-select span
+### MA1 — Drag-to-select span
 
 **Action sequence:**
 1. Switch to Manual mode
-2. Click text area generic — snapshot shows "Başlangıç:0 — bitiş için tıkla"
-3. Click same element again — snapshot shows "[0-6]" range
+2. **mousedown** at start of desired text, **drag** across words, **mouseup**
+3. Snapshot shows selected range (e.g. "[0-6]")
 
-**Result:** Range [0-6] = "Manzara". Token snapping via `getTokenBounds()` expands to word boundaries.
+**Result:** Range [0-6] = "Manzara". Native browser blue selection highlight visible. Token snapping via `getTokenBounds()` expands to word boundaries.
 
 ### MA2 — Form opens after span selection
 
@@ -212,8 +239,8 @@ Elements present:
 ### MA5 — Delete a triplet
 
 **Tag:** ✓ code
-**Code path:** `PhraseAnnotator.tsx L363: onClick={() => onRemoveAnnotation(ann.id)}`, App.tsx L304: filters by id.
-**Live note:** ✕ buttons inside scrollable annotation lists were not consistently clickable via CDP (`DOM.getBoxModel` errors). Temizle button (same state pattern) was tested successfully instead.
+**Code path:** `PhraseAnnotator.tsx` `onRemoveAnnotation(ann.id)`, App.tsx filters by id.
+**Live note:** ✕ buttons inside scrollable annotation lists may be inconsistent via CDP. Use Temizle button as proxy.
 
 ### MA6 — Save with no category/polarity
 
@@ -338,18 +365,16 @@ Elements present:
 |---|---|---|---|
 | `/settings` | GET | 200 | Returns config, total_count=5 |
 | `/data/{idx}` | GET | 200 | Review data with label, model triplets |
-| `/review/{idx}/save` | POST | 200 | **Only live save endpoint** (`/annotations/{idx}` is dead code) |
+| `/review/{idx}/save` | POST | 200 | **Only live save endpoint** |
 | `/agent/chat` | POST | 200 | Provider dispatch + rule-based fallback |
 
 ---
 
 ## Browser tool interaction notes
 
-The `browser_click` tool clicks elements identified by accessibility tree ref IDs:
+1. **Native drag selection works naturally** — mousedown, drag, mouseup. The `useTextSelection` hook reads `window.getSelection()` on mouseup and computes character offsets via `Range.toString().length` walking. Token snapping still applies.
 
-1. **Two-click pattern on the same ref works** — clicking the same text container ref twice triggers `handleCharClick`: first click sets `selStart`, second sets `selEnd`, popup appears.
-
-2. **Clicking two different run refs is unreliable** — after annotations split text into runs by background color, clicking different refs sometimes resets selection due to React re-rendering run boundaries.
+2. **Single click selects one token** — mousedown + mouseup without drag selects the word at the click position (token-snapped).
 
 3. **✕ delete buttons inside scrollable annotation lists** are not consistently reachable via CDP. The Temizle button (same state management) is a reliable proxy.
 
@@ -357,16 +382,12 @@ The `browser_click` tool clicks elements identified by accessibility tree ref ID
 
 ---
 
-## Existing automated test coverage
+## Coverage summary
 
-```bash
-pytest tests/    # 71 tests, ~0.2s
-```
-
-Coverage maps to testcases as follows:
-
-| test file | `_derive_provider` | `find_phrase_positions` | `parse_triplet_column` | `build_absa_models` | `build_prediction_prompt` | `generate_mock_reasoning` |
-|---|---|---|---|---|---|---|
-| `test_llm_providers.py` | 12 tests | — | — | — | — | — |
-| `test_prediction.py` | — | 9 tests | — | 4 tests | 6 tests | 6 tests |
-| `test_main_helpers.py` | — | — | 12 tests | — | — | — |
+| Suite | Command | Count |
+|---|---|---|
+| Backend pure logic | `pytest tests/` | 93 |
+| Frontend pure functions | `npx vitest run` | 13 (hook) |
+| Frontend component tests | `npx vitest run` | 14 (toolbox) |
+| **Total automated** | | **120** |
+| Manual browser walkthrough | `tests/testcases.md` tiers 1–8 | ~50 cases |
