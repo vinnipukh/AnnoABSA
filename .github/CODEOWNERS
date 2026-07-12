@@ -1,0 +1,5 @@
+# Enforce manual review for any test or pipeline modifications
+/tests/                                             @vinnipukh
+/.github/workflows/                                 @vinnipukh
+/frontend/src/components/NlpHelperToolbar.test.tsx  @vinnipukh
+/frontend/src/hooks/useTextSelection.test.ts        @vinnipukh
