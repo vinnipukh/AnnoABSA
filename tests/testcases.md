@@ -152,11 +152,11 @@ Covers automated (pytest + vitest) and manual (browser) test cases.
 ## Automated Tests
 
 ```bash
-pytest tests/        # 124 backend tests
+pytest tests/        # 133 backend tests
 cd frontend && npx vitest run   # 27 frontend tests
 ```
 
-### Backend (pytest — 124 tests)
+### Backend (pytest — 133 tests)
 
 | File | Tests | What it covers | Correlates to |
 |---|---|---|---|
@@ -165,6 +165,7 @@ cd frontend && npx vitest run   # 27 frontend tests
 | `tests/test_main_helpers.py` | 12 | `parse_triplet_column` (STD tuples, lists, dicts, empty/null) | KA7 NULL handling, data loading |
 | `tests/test_nlp_helpers.py` | 12 | `lexicon_polarity`, `sentiment_classify`, `morphology`, `embedding_similarity` (all mocked) | NLB1–NLB8 handler logic |
 | `tests/test_live_prediction.py` | 31 | `get_live_prediction` happy path, error cases (no provider, no model, unknown role), temperature propagation, per-model config validation | LC1–LC10 live compare mode |
+| `tests/test_smoke.py` | ~9 | `GET /settings`, `GET /data/0`, import chain, 404, CORS (CSV + JSON) | S1/S5 smoke tests |
 
 ### Frontend (vitest — 27 tests)
 
@@ -402,8 +403,8 @@ Elements present:
 
 | Suite | Command | Count |
 |---|---|---|
-| Backend pure logic | `pytest tests/` | 124 |
+| Backend pure logic | `pytest tests/` | 133 |
 | Frontend pure functions | `npx vitest run` | 13 (hook) |
 | Frontend component tests | `npx vitest run` | 14 (toolbox) |
-| **Total automated** | | **151** |
+| **Total automated** | | **160** |
 | Manual browser walkthrough | `tests/testcases.md` tiers 1–9 | ~60 cases |
