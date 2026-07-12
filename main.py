@@ -1,4 +1,5 @@
 """AnnoABSA FastAPI backend — application, endpoints, and data persistence."""
+from app.config import *  # noqa: F401, F403 — re-export for backward compat (cli.py, tests)
 import re
 import time
 import numpy as np
