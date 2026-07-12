@@ -165,7 +165,7 @@ python cli.py examples/semeval_reviews.json --load-config examples/example_confi
 
 ```bash
 pip install 'setuptools<75'
-pip install -r requirements.txt
+pip install -e .
 cd frontend
 npm install
 cd ..

@@ -8,17 +8,14 @@ How to use: pick a task, read `CONTRIBUTING.md` for the workflow, then go.
 |---|---|---|---|---|
 | 🟢 | NLP Helper Toolbar — lexicon lookup, embedding comparer, morphological analyzer | Backend + Frontend | Hard | `nlp_helpers.py`, `NlpHelperToolbar.tsx`, `PhraseAnnotator.tsx`, both modes |
 | 🔴 | Break up `main.py` into `app/` package (scaffolding exists) | Backend | Medium | `app/` modules, `main.py` → thin import |
-| ⚪ | Add temperature option to settings | Frontend + Backend | Easy | Superseded by Phase 4 — see `agentdocs/phase4/phase4_plan.md` |
-| ⚪ | System prompt for Model A, B and Helper Agent | Frontend + Backend | Medium | Superseded by Phase 4 — see `agentdocs/phase4/phase4_plan.md` |
-| 🔴 | **Phase 4: Live Compare Mode** — per-model provider/model/prompt/temperature for Model A, Model B, and Helper Agent. Live vs CSV mode selector. | Backend + Frontend | Hard | See `agentdocs/phase4/phase4_plan.md` for full list |
+| 🟢 | **Phase 4: Live Compare Mode** — per-model provider/model/prompt/temperature for Model A, Model B, and Helper Agent. Live vs CSV mode selector. | Backend + Frontend | Hard | See `agentdocs/phase4/phase4_plan.md` for full list |
+| 🔴 | Logo color — make logo respect dark/light theme | Frontend | Easy | `App.tsx` or header SVG |
 | 🔴 | Shortcut for AI suggestions | Frontend | Easy | `App.tsx` or keyboard handler |
 | 🔴 | Automate browser smoke tests (S1 app-load, S5 backend-reachable) | Backend + Frontend | Medium | `tests/`, new test file |
 | 🔴 | Clean up root runtime artifact `temp_absa_config.json` — write to `temp/` | Backend | Easy | `cli.py` |
 | 🔴 | Consolidate `pyproject.toml` and `requirements.txt` to one source of truth | Backend | Easy | `pyproject.toml`, `requirements.txt` |
 | 🔴 | Update `.gitignore` — add `uploads/`, `app/`, missing patterns | Backend | Easy | `.gitignore` |
 | 🔴 | Delete `annoabsa` entry-point shim (redundant, README uses `python cli.py`) | Backend | Easy | `annoabsa` file, `README.md` |
-- **Logo Color Change**: Logo color does not change when the user's browser theme is dark or light.
----
 
 ## Notes
 

@@ -92,7 +92,21 @@ class ABSAAnnotatorConfig:
             "compare_model_b_csv": None,
             "compare_model_b_name": None,
             "labeling_prompt_template": CLI_DEFAULT_LABELING_TEMPLATE,
-            "helper_agent_prompt_template": CLI_DEFAULT_CHAT_TEMPLATE
+            "helper_agent_prompt_template": CLI_DEFAULT_CHAT_TEMPLATE,
+            # Phase 4: Live Compare Mode defaults
+            "compare_mode": "csv",
+            "model_a_provider": None,
+            "model_a_model": None,
+            "model_a_prompt": CLI_DEFAULT_LABELING_TEMPLATE,
+            "model_a_temperature": 0.7,
+            "model_b_provider": None,
+            "model_b_model": None,
+            "model_b_prompt": CLI_DEFAULT_LABELING_TEMPLATE,
+            "model_b_temperature": 0.7,
+            "helper_agent_provider": None,
+            "helper_agent_model": None,
+            "helper_agent_prompt": CLI_DEFAULT_CHAT_TEMPLATE,
+            "helper_agent_temperature": 0.7,
         }
 
     def set_sentiment_elements(self, elements: List[str]) -> None:
@@ -303,7 +317,8 @@ def start_backend(port: int = 8000, host: str = "localhost", data_path: str = No
             os.environ['ABSA_DATA_PATH'] = data_path
         if config:
             # Save config to temporary file for backend to read
-            config_file = "temp_absa_config.json"
+            os.makedirs("temp", exist_ok=True)
+            config_file = os.path.join("temp", "temp_absa_config.json")
             config.save_config(config_file)
             os.environ['ABSA_CONFIG_PATH'] = config_file
 

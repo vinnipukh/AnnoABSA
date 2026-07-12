@@ -337,6 +337,10 @@ export default function App() {
     }
   };
 
+  // Keep a ref to fetchAIPrediction for use in event handlers (avoids stale closures)
+  const fetchAIPredictionRef = useRef(fetchAIPrediction);
+  fetchAIPredictionRef.current = fetchAIPrediction;
+
   // ── Live Compare Mode ──
 
   const fetchLivePrediction = async (role: 'model_a' | 'model_b') => {
@@ -403,6 +407,23 @@ export default function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex, enablePrePrediction, disableAiAutomaticPrediction, manualTriplets.length, aiTriggeredForIndex]);
+
+  // ── Keyboard shortcuts ──
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Shift+A (or Cmd+Shift+A) → trigger AI prediction
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        if (enablePrePrediction && !isAIPredicting) {
+          fetchAIPredictionRef.current();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [enablePrePrediction, isAIPredicting]);
 
   // ── Settings Panel ──
 
@@ -507,7 +528,11 @@ export default function App() {
     <div className="bg-base-300 text-base-content min-h-screen flex flex-col font-sans selection:bg-primary selection:text-primary-content">
       <header className="h-12 bg-base-200/90 border-b border-base-300 px-4 flex items-center justify-between flex-shrink-0 z-20 shadow-sm">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center font-black text-primary-content shadow text-sm">A</div>
+          <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shadow-sm">
+            <svg className="w-4 h-4 text-white" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 1L2 15h3l1-3h4l1 3h3L8 1zM7.5 4.5L10 10H5l2.5-5.5z" />
+            </svg>
+          </div>
           <h1 className="text-sm font-bold text-base-content">AnnoABSA</h1>
         </div>
         <div className="flex items-center gap-2">
@@ -548,7 +573,7 @@ export default function App() {
                   ? 'bg-success/20 text-success border-success/30 hover:bg-success/30'
                   : 'bg-base-200 text-base-content/50 border-base-300 hover:text-primary hover:border-primary/40'
               }`}
-              title={isAIPredicting ? 'AI tahmin ediyor...' : 'AI Önerisi Al'}>
+              title={isAIPredicting ? 'AI tahmin ediyor...' : 'AI Önerisi Al (Ctrl+Shift+A)'}>
               {isAIPredicting ? (
                 <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               ) : (

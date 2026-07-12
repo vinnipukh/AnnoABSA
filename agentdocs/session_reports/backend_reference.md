@@ -8,10 +8,10 @@ After root reorganization, the backend spans six files:
 
 | File | Lines | Purpose |
 |---|---|---|
-| `main.py` | ~1053 | Global state, data I/O, most HTTP endpoints, startup |
+| `main.py` | ~1206 | Global state, data I/O, most HTTP endpoints, startup |
 | `models/schemas.py` | ~12 | Pydantic request models |
 | `services/prediction.py` | ~357 | Prompt building, BM25 retrieval, position logic, template constants |
-| `services/llm_providers.py` | ~502 | LLM provider adapters, registry, factory, dispatch |
+| `services/llm_providers.py` | ~557 | LLM provider adapters, registry, factory, dispatch, per-model config validation |
 | `services/nlp_helpers.py` | ~280 | NLP Helper Toolbar: 4 lazy-loaded tools (SentiNet, BERT, NlpToolkit, e5-small) |
 | `app/routes/nlp.py` | ~70 | APIRouter for 4 NLP endpoints (lexicon-polarity, sentiment, morphology, embedding-similarity) |
 
@@ -121,6 +121,13 @@ Used by `get_provider()` to map provider name → class.
 - **Called by:** `get_ai_prediction()`, `agent_chat()`, `cli.py` startup.
 - **Note:** Replaces the triplicated inline validation that previously existed in all three call sites.
 
+#### `validate_per_model_config(role: str, config: dict) -> list[str]`
+- **Purpose:** Validate per-model config completeness (Phase 4 Live Compare Mode).
+- **Checks:** `{role}_provider` must be set, `{role}_model` must be set, and the chosen provider's required global keys must be present (via `validate_provider_config`).
+- **Returns:** Empty list if valid, error strings otherwise.
+- **Called by:** `get_live_prediction()` endpoint.
+- **Note:** No fallback — if provider or model is blank, the endpoint returns HTTP 400.
+
 #### `get_provider(provider_name: str, config: dict) -> ProviderClass`
 - **Purpose:** Factory — instantiate the right provider adapter.
 - **Raises:** `ValueError` for unknown provider names.
@@ -130,10 +137,10 @@ Used by `get_provider()` to map provider name → class.
 
 | Provider | Requires | `predict()` | `chat()` |
 |---|---|---|---|
-| **`OllamaProvider`** | Running Ollama server (default `localhost:11434`) | `ollama.generate` with Pydantic `model_json_schema()` for structured output | `ollama.chat()` |
-| **`OpenAIProvider`** | `openai_key` in config | `client.beta.chat.completions.parse` with Pydantic `response_format` | `client.chat.completions.create` |
-| **`AnthropicProvider`** | `anthropic_key` in config | `client.messages.create`, parses JSON from response text (no structured output support from Anthropic) | Same, with OpenAI→Anthropic format conversion |
-| **`VLLMProvider`** | `vllm_url` in config (e.g. `http://localhost:8001/v1`) | Standard completion + manual JSON parse (vLLM doesn't support `beta.parse`) | OpenAI client with custom `base_url` |
+| **`OllamaProvider`** | Running Ollama server (default `localhost:11434`) | `predict(temperature=0.7)` — `ollama.generate` with Pydantic `model_json_schema()` for structured output | `ollama.chat()` |
+| **`OpenAIProvider`** | `openai_key` in config | `predict(temperature=0.7)` — `client.beta.chat.completions.parse` with Pydantic `response_format` | `client.chat.completions.create` |
+| **`AnthropicProvider`** | `anthropic_key` in config | `predict(temperature=0.7)` — `client.messages.create`, parses JSON from response text (no structured output support from Anthropic) | Same, with OpenAI→Anthropic format conversion |
+| **`VLLMProvider`** | `vllm_url` in config (e.g. `http://localhost:8001/v1`) | `predict(temperature=0.7)` — Standard completion + manual JSON parse (vLLM doesn't support `beta.parse`) | OpenAI client with custom `base_url` |
 
 ### Backward-Compatible Wrapper
 
@@ -217,7 +224,7 @@ Used by `get_provider()` to map provider name → class.
 
 ---
 
-## main.py — FastAPI Endpoints (10)
+## main.py — FastAPI Endpoints (11)
 
 | Method | Path | Handler | Purpose |
 |---|---|---|---|---|
@@ -230,6 +237,7 @@ Used by `get_provider()` to map provider name → class.
 | POST | `/upload-data` | `upload_data()` | Accept CSV/JSON upload, activate as current dataset |
 | POST | `/review/{data_idx}/save` | `save_review_triplets()` | **PRIMARY save** — called by `handleNextReview` in both modes |
 | GET | `/ai_prediction/{data_idx}` | `get_ai_prediction()` | Generate AI predictions via configured LLM provider |
+| GET | `/live_prediction/{data_idx}` | `get_live_prediction()` | Generate AI predictions using per-model config for Live Compare Mode. Requires `?role=model_a\|model_b` |
 | POST | `/agent/chat` | `agent_chat()` | Handle Helper Agent chat messages |
 
 ## app/routes/nlp.py — NLP Helper Toolbar Endpoints (4)

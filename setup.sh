@@ -42,7 +42,7 @@ pip install 'setuptools<75' 2>/dev/null || echo "[WARN] setuptools pin failed, c
 
 # Install Python deps
 echo "[3/5] Installing Python dependencies..."
-pip install -r requirements.txt
+pip install -e .
 
 # Install frontend deps
 echo "[4/5] Installing frontend dependencies..."

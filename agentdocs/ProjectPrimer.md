@@ -12,17 +12,18 @@ reference, and `tests/testcases.md` for the regression baseline.
 ## Stack
 
 - **Backend**: Python (3.11), FastAPI, pandas, rank-bm25, ollama, openai, anthropic.
-  - `main.py` (~1053 lines) — global state, data I/O, all 10 HTTP endpoints, startup.
+  - `main.py` (~1206 lines) — global state, data I/O, all 11 HTTP endpoints, startup.
   - `services/prediction.py` — prompt building, BM25 retrieval, position helpers, template constants.
-  - `services/llm_providers.py` — 4 provider adapters (OllamaProvider, OpenAIProvider, AnthropicProvider, VLLMProvider) + registry + dispatch.
+  - `services/llm_providers.py` — 4 provider adapters (OllamaProvider, OpenAIProvider, AnthropicProvider, VLLMProvider) + registry + dispatch + per-model config validation (`validate_per_model_config`).
   - `services/nlp_helpers.py` — NLP Helper Toolbar: 4 lazy-loaded tools (SentiNet, BERT, NlpToolkit, e5-small).
   - `app/routes/nlp.py` — APIRouter with 4 NLP endpoints (lexicon-polarity, sentiment, morphology, embedding-similarity).
   - `models/schemas.py` — Pydantic models (SaveTripletsRequest, AgentChatRequest).
   - `cli.py` — argparse-based launcher, starts backend + frontend as subprocesses.
+  - `tests/test_live_prediction.py` — Phase 4 Live Compare Mode endpoint tests.
 - **Frontend**: React + TypeScript, Vite, Tailwind (`frontend/src/`).
 - **Data storage**: CSV or JSON, loaded/saved via `load_data()`/`save_data()` in `main.py`.
   File type is auto-detected from extension.
-- **Tests**: pytest in `tests/` (93 tests), manual walkthrough in `tests/testcases.md`.
+- **Tests**: pytest in `tests/` (124 tests), manual walkthrough in `tests/testcases.md`.
 
 ---
 
@@ -83,6 +84,28 @@ Supported column combinations:
 - `"NULL"` is a literal string sentinel for implicit aspects/opinions — never convert to `""`.
 - Saved via `POST /review/{idx}/save` (the only live save endpoint — `/annotations/{idx}` was deleted).
 
+### Phase 4: Live Compare Mode config keys
+
+Added to the JSON config file and settings panel:
+
+| Key | Type | Default | Purpose |
+|---|---|---|---|
+| `compare_mode` | `"csv" \| "live"` | `"csv"` | Compare mode selector |
+| `model_a_provider` | `str\|None` | `None` | Provider for Model A live predictions |
+| `model_a_model` | `str\|None` | `None` | Model name for Model A |
+| `model_a_prompt` | `str\|None` | `DEFAULT_LABELING_TEMPLATE` | Prompt template for Model A |
+| `model_a_temperature` | `float` | `0.7` | Temperature for Model A |
+| `model_b_provider` | `str\|None` | `None` | Provider for Model B live predictions |
+| `model_b_model` | `str\|None` | `None` | Model name for Model B |
+| `model_b_prompt` | `str\|None` | `DEFAULT_LABELING_TEMPLATE` | Prompt template for Model B |
+| `model_b_temperature` | `float` | `0.7` | Temperature for Model B |
+| `helper_agent_provider` | `str\|None` | `None` | Provider for Helper Agent |
+| `helper_agent_model` | `str\|None` | `None` | Model name for Helper Agent |
+| `helper_agent_prompt` | `str\|None` | `DEFAULT_CHAT_TEMPLATE` | Chat prompt for Helper Agent |
+| `helper_agent_temperature` | `float` | `0.7` | Temperature for Helper Agent |
+
+Note: no fallback — if `model_a_provider` is `None`, the endpoint returns HTTP 400.
+
 ---
 
 ## How to run
@@ -142,10 +165,24 @@ set ABSA_CONFIG_PATH=config.json
 uvicorn main:app --port=8000
 ```
 
+### Live Compare Mode (Phase 4)
+
+```bash
+# 1. Start the app (CSV mode is default)
+python cli.py --data-path examples/semeval_reviews.csv
+
+# 2. Open Settings → switch "Karşılaştırma Modu" to ⚡ Canlı
+# 3. Configure Model A and Model B with their own provider, model, prompt, temperature
+# 4. Close Settings
+# 5. Click "Model A Çalıştır" / "Model B Çalıştır" in each column
+```
+
+Requires the chosen LLM providers to be running (Ollama server, API keys configured, etc.).
+
 ### Running tests
 
 ```bash
-pytest tests/          # 93 automated tests
+pytest tests/          # 124 automated tests
 ```
 
 Manual walkthrough: `tests/testcases.md` requires a running backend + frontend + browser.

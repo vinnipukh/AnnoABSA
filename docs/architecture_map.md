@@ -40,7 +40,7 @@ main.py  (residual — ~1053 lines)
 │  Config: load_config(), set_config()
 │  Helper methods: get_total_count(), get_current_index(), max_number_of_idxs()
 │  Position logic: auto_add_missing_positions()
-│  Endpoints (10 in main.py, 4 in nlp router = 14 total):
+|  Endpoints (11 in main.py, 4 in nlp router = 15 total):
 │    GET  /settings
 │    PATCH /settings
 │    GET  /data/{data_idx}
@@ -50,6 +50,7 @@ main.py  (residual — ~1053 lines)
 │    POST /upload-data
 │    POST /review/{data_idx}/save
 │    GET  /ai_prediction/{data_idx}
+│    GET  /live_prediction/{data_idx}  — per-model live prediction (Phase 4)
 │    POST /agent/chat
 │  Startup: startup_event()
 │
@@ -143,6 +144,20 @@ POST /agent/chat
    └─ fallback: Turkish rule-based responses on error
 ```
 
+### Live Prediction flow (Phase 4)
+
+```
+GET /live_prediction/{idx}?role=model_a|model_b
+   │
+   ├─ validate_per_model_config(role, CONFIG_DATA)
+   │    • provider and model must be non-None (no fallback)
+   │    • provider's global keys (openai_key, etc.) validated
+   ├─ get_provider(CONFIG_DATA[{role}_provider], CONFIG_DATA)
+   ├─ provider.predict(temperature=CONFIG_DATA[{role}_temperature],
+   │                    prompt_template=CONFIG_DATA[{role}_prompt])
+   └─ add position data if save_phrase_positions is enabled
+```
+
 ---
 
 ## 3. Frontend module graph (`frontend/src/`)
@@ -212,7 +227,7 @@ Each provider class implements:
 def predict(self, text, considered_sentiment_elements, examples,
             aspect_categories, polarities, allow_implicit_aspect_terms,
             allow_implicit_opinion_terms, n_few_shot, llm_model,
-            prompt_template=None) -> (dict, list)
+            prompt_template=None, temperature=0.7) -> (dict, list)
 ```
 
 And:
@@ -249,13 +264,13 @@ Both `get_ai_prediction` and `agent_chat` endpoints dispatch the same way:
 
 | File(s) | What lives there | Task |
 |---|---|---|---|
-| `main.py` | Global state, data I/O, config functions, 10 HTTP endpoints, startup event | Residual / Phase 2 Task 2 |
+| `main.py` | Global state, data I/O, config functions, 11 HTTP endpoints, startup event, validate_per_model_config import | Residual / Phase 2 Task 2, Phase 4 Task 1 |
 | `models/schemas.py` | SaveTripletsRequest, AgentChatRequest | Step 2 of root reorg |
 | `services/prediction.py` | Templates, prompt builders, BM25 retrieval, position helpers | Step 4 of root reorg |
-| `services/llm_providers.py` | 4 provider adapter classes, registry, factory, _derive_provider, predict_llm | Task 3 + Step 3 of root reorg |
+| `services/llm_providers.py` | 4 provider adapter classes, registry, factory, _derive_provider, predict_llm, validate_provider_config, validate_per_model_config | Task 3 + Step 3 of root reorg + Phase 4 Task 1 |
 | `services/nlp_helpers.py` | 4 lazy-loaded NLP tools + 4 handler functions | Phase 3 Task 1 (new) |
 | `app/routes/nlp.py` | APIRouter with 4 NLP endpoints (first production route file) | Phase 3 Task 1 (new) |
-| `cli.py` | Argparse, config management, start_backend/start_frontend, STD format conversion | Tasks 1, 3, 4 |
+| `cli.py` | Argparse, config management, start_backend/start_frontend, STD format conversion, Phase 4 default config keys | Tasks 1, 3, 4 + Phase 4 Task 4 |
 | `frontend/src/App.tsx` | Top-level layout, mode toggle, chat toggle, NLP toolbar state, state management | Tasks 2, 5 + P3T1 |
 | `frontend/src/types.ts` | TripletItem, ReviewComparisonData with model_a/b naming | Task 2 |
 | `frontend/src/components/PhraseAnnotator.tsx` | Click-to-select span annotator (uses useTextSelection hook) | Task 5 + Phase 3 Task 1 |
@@ -292,3 +307,13 @@ Both `get_ai_prediction` and `agent_chat` endpoints dispatch the same way:
 - **Template constants are duplicated** between `services/prediction.py` and `cli.py`
   (CLI can't import from prediction.py without triggering FastAPI import-time side effects).
   Keep both copies in sync.
+- **`get_live_prediction` reads per-model config from `CONFIG_DATA`, not `load_config()`**
+  The live prediction endpoint uses `CONFIG_DATA.get(f"{role}_provider")` directly rather than
+  `load_config().get(...)`. This ensures settings panel `PATCH /settings` updates take effect
+  immediately. The existing `get_ai_prediction` endpoint uses `load_config()` for some reads
+  and `CONFIG_DATA` for others — both work when a config file is active, but in tests you
+  must mutate `CONFIG_DATA`, not mock `load_config()`.
+- **`predict()` now accepts `temperature=0.7`** — all 4 provider adapters and the `predict_llm()`
+  wrapper accept this parameter. The default is 0.7 (was hardcoded 0.0).
+- **`validate_per_model_config()`** — Phase 4 validation function in `services/llm_providers.py`.
+  Checks per-model config completeness. Called by `get_live_prediction()`.

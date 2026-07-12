@@ -168,7 +168,13 @@ function ModelConfigSection({ title, prefix, form, setForm }: {
     <div className="collapse collapse-arrow bg-base-200/50 rounded-xl border border-base-300 mb-2">
       <input type="checkbox" defaultChecked={false} />
       <div className="collapse-title text-xs font-bold text-base-content flex items-center gap-2 min-h-0 py-2.5">
-        <span className={isConfigured ? 'text-success' : 'text-base-content/30'}>{isConfigured ? '🟢' : '⚪'}</span>
+        <svg className={`w-3.5 h-3.5 flex-shrink-0 ${isConfigured ? 'text-success' : 'text-base-content/30'}`} fill="currentColor" viewBox="0 0 24 24">
+          {isConfigured ? (
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+          ) : (
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+          )}
+        </svg>
         {title}
       </div>
       <div className="collapse-content space-y-1 pt-0">
@@ -351,23 +357,29 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <div className="flex gap-2 py-1.5 px-1">
               <button
                 onClick={() => setForm(p => ({ ...p, compare_mode: 'csv' }))}
-                className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all border ${
+                className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all border flex items-center justify-center gap-2 ${
                   form.compare_mode === 'csv'
                     ? 'bg-primary text-primary-content border-primary shadow-sm'
                     : 'bg-base-200 text-base-content/60 border-base-300 hover:text-base-content'
                 }`}
               >
-                📁 CSV
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                CSV
               </button>
               <button
                 onClick={() => setForm(p => ({ ...p, compare_mode: 'live' }))}
-                className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all border ${
+                className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all border flex items-center justify-center gap-2 ${
                   form.compare_mode === 'live'
                     ? 'bg-primary text-primary-content border-primary shadow-sm'
                     : 'bg-base-200 text-base-content/60 border-base-300 hover:text-base-content'
                 }`}
               >
-                ⚡ Canlı
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Canlı
               </button>
             </div>
           </section>
@@ -463,7 +475,21 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
         <div className="flex items-center justify-between px-5 py-3 border-t border-base-300 bg-base-100/90 flex-shrink-0">
           <span className="text-[10px] text-base-content/40">
-            {hasChanged() ? '⚡ Kaydedilmemiş değişiklikler var' : '✓ Tüm ayarlar güncel'}
+            {hasChanged() ? (
+              <span className="flex items-center gap-1">
+                <svg className="w-3 h-3 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Kaydedilmemiş değişiklikler var
+              </span>
+            ) : (
+              <span className="flex items-center gap-1">
+                <svg className="w-3 h-3 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Tüm ayarlar güncel
+              </span>
+            )}
           </span>
           <div className="flex items-center gap-2">
             <button onClick={onClose}

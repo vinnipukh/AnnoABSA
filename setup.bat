@@ -47,7 +47,7 @@ if %errorlevel% neq 0 (
 
 REM Install Python deps
 echo [3/5] Installing Python dependencies...
-pip install -r requirements.txt
+pip install -e .
 if %errorlevel% neq 0 (
     echo [FAIL] pip install failed
     pause
