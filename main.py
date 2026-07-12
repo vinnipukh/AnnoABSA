@@ -113,7 +113,21 @@ def load_config():
         "compare_model_b_name": None,
         "labeling_prompt_template": DEFAULT_LABELING_TEMPLATE,
         "helper_agent_prompt_template": DEFAULT_CHAT_TEMPLATE,
-        "theme": "dark"
+        "theme": "dark",
+        # Phase 4: Live Compare Mode config
+        "compare_mode": "csv",
+        "model_a_provider": None,
+        "model_a_model": None,
+        "model_a_prompt": DEFAULT_LABELING_TEMPLATE,
+        "model_a_temperature": 0.7,
+        "model_b_provider": None,
+        "model_b_model": None,
+        "model_b_prompt": DEFAULT_LABELING_TEMPLATE,
+        "model_b_temperature": 0.7,
+        "helper_agent_provider": None,
+        "helper_agent_model": None,
+        "helper_agent_prompt": DEFAULT_CHAT_TEMPLATE,
+        "helper_agent_temperature": 0.7,
     }
 
 
@@ -196,6 +210,20 @@ def get_settings():
         "n_few_shot": CONFIG_DATA.get("n_few_shot", 10),
         "compare_model_a_name": CONFIG_DATA.get("compare_model_a_name", None),
         "compare_model_b_name": CONFIG_DATA.get("compare_model_b_name", None),
+        # Phase 4: Live Compare Mode settings
+        "compare_mode": CONFIG_DATA.get("compare_mode", "csv"),
+        "model_a_provider": CONFIG_DATA.get("model_a_provider", None),
+        "model_a_model": CONFIG_DATA.get("model_a_model", None),
+        "model_a_prompt": CONFIG_DATA.get("model_a_prompt", None),
+        "model_a_temperature": CONFIG_DATA.get("model_a_temperature", 0.7),
+        "model_b_provider": CONFIG_DATA.get("model_b_provider", None),
+        "model_b_model": CONFIG_DATA.get("model_b_model", None),
+        "model_b_prompt": CONFIG_DATA.get("model_b_prompt", None),
+        "model_b_temperature": CONFIG_DATA.get("model_b_temperature", 0.7),
+        "helper_agent_provider": CONFIG_DATA.get("helper_agent_provider", None),
+        "helper_agent_model": CONFIG_DATA.get("helper_agent_model", None),
+        "helper_agent_prompt": CONFIG_DATA.get("helper_agent_prompt", None),
+        "helper_agent_temperature": CONFIG_DATA.get("helper_agent_temperature", 0.7),
         "current_index": get_current_index(),
         "max_number_of_idxs": max_number_of_idxs()
     }
@@ -822,6 +850,124 @@ def get_ai_prediction(data_idx: int):
             status_code=500, detail=f"Error loading prediction: {str(e)}")
 
 
+@app.get("/live_prediction/{data_idx}")
+def get_live_prediction(data_idx: int, role: str = "model_a"):
+    """Generate AI predictions using per-model config (Live Compare Mode).
+
+    Reads per-model config keys (role_provider, role_model, role_prompt,
+    role_temperature) instead of global llm_provider. Each model (A, B)
+    must have its own provider and model configured — no fallback.
+
+    Args:
+        data_idx: 0-based row index.
+        role: 'model_a' or 'model_b'.
+
+    Returns:
+        List of predicted aspect dicts with keys: aspect_term, aspect_category,
+        sentiment_polarity, opinion_term, at_start, at_end, ot_start, ot_end.
+    """
+    if role not in ("model_a", "model_b"):
+        raise HTTPException(
+            status_code=400, detail=f"Unknown role '{role}'. Use 'model_a' or 'model_b'.")
+
+    try:
+        data = load_data()
+        config = load_config()
+        default_aspects = config.get('aspect_categories', [])
+        examples = []
+
+        # Read per-model config keys from live in-memory config (CONFIG_DATA)
+        # so that settings panel PATCH updates take effect immediately.
+        provider_name = CONFIG_DATA.get(f"{role}_provider")
+        llm_model = CONFIG_DATA.get(f"{role}_model")
+        prompt_template = CONFIG_DATA.get(f"{role}_prompt")
+        temperature = CONFIG_DATA.get(f"{role}_temperature", 0.7)
+
+        # Validate per-model config is complete (no fallback)
+        from services.llm_providers import validate_per_model_config
+        val_errors = validate_per_model_config(role, CONFIG_DATA)
+        if val_errors:
+            raise HTTPException(status_code=400, detail="; ".join(val_errors))
+
+        # Load the review text and collect examples
+        if DATA_FILE_TYPE == "json":
+            if data_idx < 0 or data_idx >= len(data):
+                raise HTTPException(status_code=404, detail="Index out of range")
+            item = data[data_idx]
+            text = item.get('text', '')
+            for entry in data:
+                lbl = entry.get('label', [])
+                if isinstance(lbl, list) and lbl:
+                    examples.append({'text': entry.get('text', ''), 'label': lbl})
+            aspect_categories = item.get('aspect_category_list', default_aspects)
+        else:
+            df = data
+            if data_idx < 0 or data_idx >= len(df):
+                raise HTTPException(status_code=404, detail="Index out of range")
+            row = df.iloc[data_idx].to_dict()
+            text = row.get('text', '')
+            for _, r in df.iterrows():
+                lbl_str = r.get('label', '')
+                if pd.isna(lbl_str) or lbl_str == '':
+                    continue
+                try:
+                    lbl = json.loads(lbl_str)
+                    if isinstance(lbl, list) and lbl:
+                        examples.append({'text': r.get('text', ''), 'label': lbl})
+                except Exception:
+                    continue
+            raw_aspects = row.get('aspect_category_list', None)
+            aspect_categories = raw_aspects if raw_aspects else default_aspects
+
+        # Filter out examples identical to the requested text
+        examples = [ex for ex in examples if ex['text'] != text]
+
+        # Validate provider has required global keys (API keys, URLs)
+        from services.llm_providers import validate_provider_config
+        prov_errors = validate_provider_config(provider_name, CONFIG_DATA)
+        if prov_errors:
+            raise HTTPException(status_code=400, detail=prov_errors[0])
+
+        # Dispatch to provider with per-model config
+        from services.llm_providers import get_provider
+        provider = get_provider(provider_name, CONFIG_DATA)
+        predictions = provider.predict(
+            text,
+            CONFIG_DATA.get('sentiment_elements', [
+                       "aspect_term", "aspect_category", "sentiment_polarity", "opinion_term"]),
+            examples,
+            aspect_categories,
+            CONFIG_DATA.get('sentiment_polarity_options', [
+                       "positive", "negative", "neutral"]),
+            allow_implicit_aspect_terms=CONFIG_DATA.get('implicit_aspect_term_allowed', True),
+            allow_implicit_opinion_terms=CONFIG_DATA.get('implicit_opinion_term_allowed', False),
+            n_few_shot=CONFIG_DATA.get('n_few_shot', 10),
+            llm_model=llm_model,
+            prompt_template=prompt_template,
+            temperature=temperature
+        )[0]
+        predictions = predictions["aspects"]
+
+        # Add position data if saving is enabled
+        if CONFIG_DATA.get('save_phrase_positions', True):
+            for aspect in predictions:
+                if 'aspect_term' in aspect and aspect['aspect_term'] != 'NULL':
+                    start, end = find_phrase_positions(text, aspect['aspect_term'])
+                    aspect['at_start'] = start
+                    aspect['at_end'] = end
+                if 'opinion_term' in aspect and aspect['opinion_term'] != 'NULL':
+                    start, end = find_phrase_positions(text, aspect['opinion_term'])
+                    aspect['ot_start'] = start
+                    aspect['ot_end'] = end
+
+        return predictions
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error in live prediction: {str(e)}")
+
+
 @app.get("/avg-annotation-time")
 def get_avg_annotation_time():
     """Calculate and return the average annotation time across all examples with timing data."""
@@ -1000,11 +1146,13 @@ def agent_chat(req: AgentChatRequest):
     model_a_name = config.get("compare_model_a_name", "Model A")
     model_b_name = config.get("compare_model_b_name", "Model B")
 
-    # Determine provider (same derivation as get_ai_prediction, via shared helper)
-    provider_name = None
+    # Read per-agent config (falls back to global if per-agent provider is unset)
+    agent_provider = CONFIG_DATA.get("helper_agent_provider") or None
+    agent_model = CONFIG_DATA.get("helper_agent_model") or None
+    agent_temperature = CONFIG_DATA.get("helper_agent_temperature", 0.7)
 
-    # Build chat messages
-    chat_template = CONFIG_DATA.get('helper_agent_prompt_template', DEFAULT_CHAT_TEMPLATE)
+    # Build chat messages using per-agent prompt (or default template)
+    chat_template = CONFIG_DATA.get("helper_agent_prompt") or CONFIG_DATA.get('helper_agent_prompt_template', DEFAULT_CHAT_TEMPLATE)
     system_content = chat_template.format(
         review_text=req.review_text,
         model_a_name=model_a_name,
@@ -1022,7 +1170,11 @@ def agent_chat(req: AgentChatRequest):
 
     # Dispatch to configured provider
     try:
-        provider_name = _derive_provider(CONFIG_DATA)
+        # Use per-agent provider if set, otherwise fall back to derived global
+        if agent_provider:
+            provider_name = agent_provider
+        else:
+            provider_name = _derive_provider(CONFIG_DATA)
         from services.llm_providers import validate_provider_config
         val_errors = validate_provider_config(provider_name, config)
         if val_errors:
@@ -1031,8 +1183,8 @@ def agent_chat(req: AgentChatRequest):
         provider = get_provider(provider_name, CONFIG_DATA)
         reply = provider.chat(
             messages=messages,
-            model=config.get("llm_model", "gemma3:4b"),
-            temperature=0.7,
+            model=agent_model or config.get("llm_model", "gemma3:4b"),
+            temperature=agent_temperature,
             max_tokens=300
         )
         return {"reply": reply}

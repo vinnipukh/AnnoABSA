@@ -33,7 +33,7 @@ class LLMProviderPort(Protocol):
     def predict(self, text, considered_sentiment_elements, examples,
                 aspect_categories, polarities, allow_implicit_aspect_terms,
                 allow_implicit_opinion_terms, n_few_shot, llm_model,
-                prompt_template=None):
+                prompt_template=None, temperature=0.7):
         """Predict ABSA triplets from text.
 
         Returns (predictions_dict, few_shot_examples_list).
@@ -44,7 +44,7 @@ class LLMProviderPort(Protocol):
         """Send a chat message and return the response text."""
         ...
 
-def predict_llm(text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms=False, allow_implicit_opinion_terms=False, n_few_shot=10, llm_model="gemma3:4b", prompt_template=None):
+def predict_llm(text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms=False, allow_implicit_opinion_terms=False, n_few_shot=10, llm_model="gemma3:4b", prompt_template=None, temperature=0.7):
     """Predict sentiment elements using Ollama (backward-compatible wrapper).
 
     Stable compatibility shim for evaluation/eval.py — delegates to the provider adapter
@@ -61,6 +61,7 @@ def predict_llm(text, considered_sentiment_elements, examples, aspect_categories
         aspect_categories, polarities,
         allow_implicit_aspect_terms, allow_implicit_opinion_terms,
         n_few_shot, llm_model, prompt_template=prompt_template,
+        temperature=temperature,
     )
     return result, examples
 
@@ -76,7 +77,7 @@ class OllamaProvider:
         """Initialize with the application config dict (CONFIG_DATA)."""
         self.config = config
 
-    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None):
+    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None, temperature=0.7):
         """Predict ABSA triplets via Ollama's generate endpoint with structured JSON output.
 
         Uses Pydantic model_json_schema() for the format parameter,
@@ -101,7 +102,7 @@ class OllamaProvider:
             prompt=prompt,
             model=llm_model,
             raw=True,
-            options={"temperature": 0.0, "max_tokens": 1024},
+            options={"temperature": temperature, "max_tokens": 1024},
             format=Aspects.model_json_schema()
         )
         aspects = Aspects.model_validate_json(response.response)
@@ -148,7 +149,7 @@ class OpenAIProvider:
         """Initialize with the application config dict (CONFIG_DATA)."""
         self.config = config
 
-    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None):
+    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None, temperature=0.7):
         """Predict ABSA triplets via OpenAI structured output (beta.parse).
 
         Uses client.beta.chat.completions.parse with a Pydantic response_format
@@ -181,7 +182,7 @@ class OpenAIProvider:
                     {"role": "user", "content": prompt},
                 ],
                 response_format=Aspects,
-                temperature=0.0
+                temperature=temperature
             )
             message = completion.choices[0].message
             if message.parsed:
@@ -243,7 +244,7 @@ class AnthropicProvider:
         """Initialize with the application config dict (CONFIG_DATA)."""
         self.config = config
 
-    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None):
+    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None, temperature=0.7):
         """Predict ABSA triplets via Anthropic Claude.
 
         Sends the prompt as a user message, then parses JSON from the
@@ -274,7 +275,7 @@ class AnthropicProvider:
             response = client.messages.create(
                 model=llm_model or "claude-sonnet-4-20250514",
                 max_tokens=1024,
-                temperature=0.0,
+                temperature=temperature,
                 system="You are a helpful assistant for aspect-based sentiment analysis. Extract the sentiment elements from the given text according to the provided instructions. Return valid JSON matching the expected schema.",
                 messages=[
                     {"role": "user", "content": prompt}
@@ -345,7 +346,7 @@ class VLLMProvider:
         """Initialize with the application config dict (CONFIG_DATA)."""
         self.config = config
 
-    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None):
+    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None, temperature=0.7):
         """Predict ABSA triplets via vLLM (standard OpenAI completion + manual JSON parse).
 
         vLLM does not support the structured output API (beta.parse), so this
@@ -380,7 +381,7 @@ class VLLMProvider:
                     {"role": "system", "content": "You are a helpful assistant for aspect-based sentiment analysis. Extract the sentiment elements from the given text according to the provided instructions. Return valid JSON matching the expected schema."},
                     {"role": "user", "content": prompt},
                 ],
-                temperature=0.0,
+                temperature=temperature,
                 max_tokens=1024
             )
             content = completion.choices[0].message.content
@@ -519,6 +520,38 @@ def validate_provider_config(provider_name: str, config: dict) -> list[str]:
         errors.append(
             "vLLM provider selected but no URL configured. Use --vllm-url."
         )
+    return errors
+
+
+def validate_per_model_config(role: str, config: dict) -> list[str]:
+    """Validate that a per-model config has its required fields.
+
+    Checks:
+    - Provider must be set
+    - Model must be set
+    - Provider-specific global keys must be present (via validate_provider_config)
+
+    Args:
+        role: 'model_a', 'model_b', or 'helper_agent'.
+        config: CONFIG_DATA dict.
+
+    Returns:
+        List of error messages (empty = valid).
+    """
+    errors = []
+    provider_name = config.get(f"{role}_provider")
+    model_name = config.get(f"{role}_model")
+
+    if not provider_name:
+        errors.append(f"{role}: No provider configured. Set it in Settings.")
+    if not model_name:
+        errors.append(f"{role}: No model configured. Set it in Settings.")
+
+    if provider_name:
+        # Check global keys required by the chosen provider
+        prov_errors = validate_provider_config(provider_name, config)
+        errors.extend(prov_errors)
+
     return errors
 
 

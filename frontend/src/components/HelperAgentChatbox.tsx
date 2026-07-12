@@ -1,11 +1,17 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ChatMessage } from '../types';
+import { ChatMessage, AppActions } from '../types';
 
 interface HelperAgentChatboxProps {
   initialReasoning: string;
   messages: ChatMessage[];
   onSendMessage: (text: string) => void;
   isLoading?: boolean;
+  /**
+   * App actions — enables autopilot mode where the Helper Agent can
+   * programmatically drive the app (navigate, switch modes, save, etc.).
+   * When provided, the agent's structured responses can trigger these actions.
+   */
+  appActions?: AppActions;
 }
 
 const MIN_W = 280;
@@ -20,7 +26,12 @@ export const HelperAgentChatbox: React.FC<HelperAgentChatboxProps> = ({
   messages,
   onSendMessage,
   isLoading = false,
+  appActions,
 }) => {
+  // Store appActions in a ref so the agent's response parser can access them
+  // without causing re-renders when they change.
+  const appActionsRef = useRef<AppActions | undefined>(appActions);
+  useEffect(() => { appActionsRef.current = appActions; }, [appActions]);
   const [minimized, setMinimized] = useState(false);
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);

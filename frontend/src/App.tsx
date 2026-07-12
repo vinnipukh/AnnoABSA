@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { TripletItem, ReviewComparisonData, ChatMessage, Settings } from './types';
+import { TripletItem, ReviewComparisonData, ChatMessage, Settings, AppActions } from './types';
 import { ModelTripletColumn } from './components/ModelTripletColumn';
 import { ManualInputForm } from './components/ManualInputForm';
 import { HelperAgentChatbox } from './components/HelperAgentChatbox';
@@ -86,6 +86,11 @@ const DEFAULT_SETTINGS: Settings = {
   openai_key: null, anthropic_key: null, vllm_url: null,
   n_few_shot: 10, compare_model_a_name: null, compare_model_b_name: null,
   theme: 'dark',
+  // Phase 4: Live Compare Mode defaults
+  compare_mode: 'csv',
+  model_a_provider: null, model_a_model: null, model_a_prompt: null, model_a_temperature: 0.7,
+  model_b_provider: null, model_b_model: null, model_b_prompt: null, model_b_temperature: 0.7,
+  helper_agent_provider: null, helper_agent_model: null, helper_agent_prompt: null, helper_agent_temperature: 0.7,
 };
 
 export default function App() {
@@ -119,6 +124,12 @@ export default function App() {
     text: string; sentence: string
   } | null>(null);
 
+  // Live Compare Mode state
+  const [liveModelATriplets, setLiveModelATriplets] = useState<TripletItem[]>([]);
+  const [liveModelBTriplets, setLiveModelBTriplets] = useState<TripletItem[]>([]);
+  const [isModelAPredicting, setIsModelAPredicting] = useState(false);
+  const [isModelBPredicting, setIsModelBPredicting] = useState(false);
+
   const backendUrl = import.meta.env?.VITE_BACKEND_URL || 'http://localhost:8000';
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -147,6 +158,9 @@ export default function App() {
     setSelectedModelBIds(new Set());
     setManualTriplets([]);
     setChatMessages([]);
+    // Clear live mode predictions on row change
+    setLiveModelATriplets([]);
+    setLiveModelBTriplets([]);
     try {
       const res = await fetch(`${backendUrl}/data/${index}`);
       if (!res.ok) throw new Error("API Offline");
@@ -198,6 +212,19 @@ export default function App() {
           compare_model_a_name: s.compare_model_a_name ?? null,
           compare_model_b_name: s.compare_model_b_name ?? null,
           theme: s.theme ?? 'dark',
+          compare_mode: s.compare_mode ?? 'csv',
+          model_a_provider: s.model_a_provider ?? null,
+          model_a_model: s.model_a_model ?? null,
+          model_a_prompt: s.model_a_prompt ?? null,
+          model_a_temperature: s.model_a_temperature ?? 0.7,
+          model_b_provider: s.model_b_provider ?? null,
+          model_b_model: s.model_b_model ?? null,
+          model_b_prompt: s.model_b_prompt ?? null,
+          model_b_temperature: s.model_b_temperature ?? 0.7,
+          helper_agent_provider: s.helper_agent_provider ?? null,
+          helper_agent_model: s.helper_agent_model ?? null,
+          helper_agent_prompt: s.helper_agent_prompt ?? null,
+          helper_agent_temperature: s.helper_agent_temperature ?? 0.7,
         });
         setEnablePrePrediction(s.enable_pre_prediction === true);
         setDisableAiAutomaticPrediction(s.disable_ai_automatic_prediction === true);
@@ -310,6 +337,33 @@ export default function App() {
     }
   };
 
+  // ── Live Compare Mode ──
+
+  const fetchLivePrediction = async (role: 'model_a' | 'model_b') => {
+    const setter = role === 'model_a' ? setLiveModelATriplets : setLiveModelBTriplets;
+    const loader = role === 'model_a' ? setIsModelAPredicting : setIsModelBPredicting;
+
+    loader(true);
+    try {
+      const res = await fetch(`${backendUrl}/live_prediction/${currentIndex}?role=${role}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Bilinmeyen hata' }));
+        setSaveToast(`❌ ${role}: ${err.detail || 'Hata'}`);
+        setTimeout(() => setSaveToast(null), 3000);
+        return;
+      }
+      const predictions: TripletItem[] = await res.json();
+      setter(predictions);
+      setSaveToast(`✅ ${role} tamamlandı (${predictions.length} etiket)`);
+      setTimeout(() => setSaveToast(null), 2500);
+    } catch (e) {
+      setSaveToast(`❌ ${role}: Sunucu hatası`);
+      setTimeout(() => setSaveToast(null), 3000);
+    } finally {
+      loader(false);
+    }
+  };
+
   const handleAcceptSuggestion = (item: AiSuggestionItem) => {
     const newId = `ai_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const triplet: TripletItem = {
@@ -414,6 +468,37 @@ export default function App() {
     }
   };
 
+  // ── Autopilot action registry ──
+  // Exposes every core action so the Helper Agent can drive the app
+  // programmatically. Extend this object when adding new interactive features.
+  const appActions = React.useMemo<AppActions>(() => ({
+    navigateTo: (index: number) => setCurrentIndex(index),
+    nextReview: () => setCurrentIndex(p => (p + 1) % totalCount),
+    prevReview: () => setCurrentIndex(p => (p - 1 + totalCount) % totalCount),
+    switchMode: (m: 'compare' | 'manual') => setMode(m),
+    toggleChat: (show?: boolean) => setShowFloatingChat(p => show ?? !p),
+    selectTriplet: (role, id) => {
+      const setter = role === 'model_a' ? setSelectedModelAIds : setSelectedModelBIds;
+      setter(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    },
+    selectAllTriplets: (role) => {
+      const triplets = role === 'model_a' ? currentData.model_a_triplets : currentData.model_b_triplets;
+      const setter = role === 'model_a' ? setSelectedModelAIds : setSelectedModelBIds;
+      setter(new Set(triplets.map(t => t.id)));
+    },
+    clearAllTriplets: (role) => {
+      const setter = role === 'model_a' ? setSelectedModelAIds : setSelectedModelBIds;
+      setter(new Set());
+    },
+    addManualTriplet: (triplet) => setManualTriplets(p => [...p, triplet]),
+    removeManualTriplet: (id) => setManualTriplets(p => p.filter(m => m.id !== id)),
+    saveAndNext: handleNextReview,
+    triggerAIPrediction: fetchAIPrediction,
+    triggerLivePrediction: fetchLivePrediction,
+    clearAll: () => { setManualTriplets([]); setSelectedModelAIds(new Set()); setSelectedModelBIds(new Set()); },
+    openSettings: () => setShowSettings(true),
+  }), [totalCount, currentData.model_a_triplets, currentData.model_b_triplets, handleNextReview, fetchAIPrediction, fetchLivePrediction]);
+
   const tripletCount = mode === 'compare'
     ? selectedModelAIds.size + selectedModelBIds.size + manualTriplets.length
     : manualTriplets.length;
@@ -496,31 +581,44 @@ export default function App() {
         <section className="flex-1 min-h-0">
           {mode === 'compare' ? (
             <div className="h-full grid grid-cols-1 md:grid-cols-3 gap-3">
-              <ModelTripletColumn title={currentData.model_a_name ? `Model A - ${currentData.model_a_name}` : "Model A"}
-                subtitle="" badgeText={currentData.model_a_name || "MODEL A"}
-                badgeColor="bg-secondary/10 text-secondary border-secondary/30"
-                triplets={currentData.model_a_triplets} selectedIds={selectedModelAIds}
-                onToggleSelect={toggleModelA} onSelectAll={selectAllModelA} onClearAll={clearAllModelA} />
-              <div className="flex flex-col h-full overflow-hidden">
-                <div className="flex-1 min-h-0">
-                  <ManualInputForm reviewText={currentData.review_text} translation={currentData.translation}
-                    categories={currentData.aspect_category_list} polarities={['positive','negative','neutral']}
-                    manualTriplets={manualTriplets}
-                    onAddTriplet={t => setManualTriplets(p => [...p, t])}
-                    onRemoveTriplet={id => setManualTriplets(p => p.filter(m => m.id !== id))}
-                    onEditReview={() => setShowEditReview(true)}
-                    clickOnToken={settings.click_on_token}
-                    onSelectionChange={handleNlpSelectionChange} />
-                </div>
-                {aiSuggestions.length > 0 && (
-                  <AISuggestions suggestions={aiSuggestions} onAccept={handleAcceptSuggestion} onReject={handleRejectSuggestion} />
-                )}
-              </div>
-              <ModelTripletColumn title={currentData.model_b_name ? `Model B - ${currentData.model_b_name}` : "Model B"}
-                subtitle="" badgeText={currentData.model_b_name || "MODEL B"}
-                badgeColor="bg-accent/10 text-accent border-accent/30"
-                triplets={currentData.model_b_triplets} selectedIds={selectedModelBIds}
-                onToggleSelect={toggleModelB} onSelectAll={selectAllModelB} onClearAll={clearAllModelB} />
+              {(() => {
+                const isLiveMode = settings.compare_mode === 'live';
+                return (
+                  <>
+                    <ModelTripletColumn title={currentData.model_a_name ? `Model A - ${currentData.model_a_name}` : "Model A"}
+                      subtitle="" badgeText={currentData.model_a_name || "MODEL A"}
+                      badgeColor="bg-secondary/10 text-secondary border-secondary/30"
+                      triplets={isLiveMode ? liveModelATriplets : currentData.model_a_triplets}
+                      selectedIds={selectedModelAIds}
+                      onToggleSelect={toggleModelA} onSelectAll={selectAllModelA} onClearAll={clearAllModelA}
+                      onRunPrediction={isLiveMode ? () => fetchLivePrediction('model_a') : undefined}
+                      isPredicting={isModelAPredicting} />
+                    <div className="flex flex-col h-full overflow-hidden">
+                      <div className="flex-1 min-h-0">
+                        <ManualInputForm reviewText={currentData.review_text} translation={currentData.translation}
+                          categories={currentData.aspect_category_list} polarities={['positive','negative','neutral']}
+                          manualTriplets={manualTriplets}
+                          onAddTriplet={t => setManualTriplets(p => [...p, t])}
+                          onRemoveTriplet={id => setManualTriplets(p => p.filter(m => m.id !== id))}
+                          onEditReview={() => setShowEditReview(true)}
+                          clickOnToken={settings.click_on_token}
+                          onSelectionChange={handleNlpSelectionChange} />
+                      </div>
+                      {aiSuggestions.length > 0 && (
+                        <AISuggestions suggestions={aiSuggestions} onAccept={handleAcceptSuggestion} onReject={handleRejectSuggestion} />
+                      )}
+                    </div>
+                    <ModelTripletColumn title={currentData.model_b_name ? `Model B - ${currentData.model_b_name}` : "Model B"}
+                      subtitle="" badgeText={currentData.model_b_name || "MODEL B"}
+                      badgeColor="bg-accent/10 text-accent border-accent/30"
+                      triplets={isLiveMode ? liveModelBTriplets : currentData.model_b_triplets}
+                      selectedIds={selectedModelBIds}
+                      onToggleSelect={toggleModelB} onSelectAll={selectAllModelB} onClearAll={clearAllModelB}
+                      onRunPrediction={isLiveMode ? () => fetchLivePrediction('model_b') : undefined}
+                      isPredicting={isModelBPredicting} />
+                  </>
+                );
+              })()}
             </div>
           ) : (
             <div className="h-full flex flex-col overflow-hidden">
@@ -552,6 +650,7 @@ export default function App() {
           messages={chatMessages}
           onSendMessage={handleSendMessage}
           isLoading={isChatLoading}
+          appActions={appActions}
         />
       )}
 

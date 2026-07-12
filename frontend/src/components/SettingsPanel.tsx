@@ -150,6 +150,61 @@ function arraysEqual(a: unknown[], b: unknown[]): boolean {
   return JSON.stringify(sa) === JSON.stringify(sb);
 }
 
+// ── Phase 4: Model Config Section (collapsible) ──
+
+const PROVIDER_OPTIONS = [
+  { value: 'ollama', label: 'Ollama (yerel)' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'vllm', label: 'vLLM' },
+];
+
+function ModelConfigSection({ title, prefix, form, setForm }: {
+  title: string; prefix: string;
+  form: FormState; setForm: React.Dispatch<React.SetStateAction<FormState>>;
+}) {
+  const isConfigured = !!(form[`${prefix}_provider`] as string) && !!(form[`${prefix}_model`] as string);
+  return (
+    <div className="collapse collapse-arrow bg-base-200/50 rounded-xl border border-base-300 mb-2">
+      <input type="checkbox" defaultChecked={false} />
+      <div className="collapse-title text-xs font-bold text-base-content flex items-center gap-2 min-h-0 py-2.5">
+        <span className={isConfigured ? 'text-success' : 'text-base-content/30'}>{isConfigured ? '🟢' : '⚪'}</span>
+        {title}
+      </div>
+      <div className="collapse-content space-y-1 pt-0">
+        <SelectRow label="Sağlayıcı" key_={`${prefix}_provider`}
+          form={form} setForm={setForm} options={PROVIDER_OPTIONS} />
+        <TextRow label="Model" key_={`${prefix}_model`}
+          form={form} setForm={setForm} placeholder="deepseek-v4-flash" />
+        <div className="py-1.5 px-1">
+          <label className="text-xs text-base-content/60 block mb-1">Sıcaklık (Temperature)</label>
+          <div className="flex items-center gap-3">
+            <input
+              type="range" min="0" max="2" step="0.1"
+              value={(form[`${prefix}_temperature`] as number) ?? 0.7}
+              onChange={(e) => setForm(p => ({ ...p, [`${prefix}_temperature`]: parseFloat(e.target.value) }))}
+              className="range range-primary range-xs flex-1"
+            />
+            <span className="text-xs font-mono text-base-content/70 w-8 text-right tabular-nums">
+              {((form[`${prefix}_temperature`] as number) ?? 0.7).toFixed(1)}
+            </span>
+          </div>
+        </div>
+        <div className="py-1.5 px-1">
+          <label className="text-xs text-base-content/60 block mb-1">Prompt</label>
+          <textarea
+            value={(form[`${prefix}_prompt`] as string) ?? ''}
+            onChange={(e) => setForm(p => ({ ...p, [`${prefix}_prompt`]: e.target.value }))}
+            rows={5}
+            className="w-full bg-base-200 border border-base-300 rounded-lg px-2.5 py-1.5 text-xs font-mono text-base-content placeholder-base-content/40 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all resize-y"
+            placeholder="Prompt template..."
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ──
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -181,6 +236,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     initial.compare_model_a_name = settings.compare_model_a_name || '';
     initial.compare_model_b_name = settings.compare_model_b_name || '';
     initial.theme = settings.theme || 'dark';
+    // Phase 4: Live Compare Mode
+    initial.compare_mode = settings.compare_mode || 'csv';
+    initial.model_a_provider = settings.model_a_provider || '';
+    initial.model_a_model = settings.model_a_model || '';
+    initial.model_a_prompt = settings.model_a_prompt || '';
+    initial.model_a_temperature = settings.model_a_temperature ?? 0.7;
+    initial.model_b_provider = settings.model_b_provider || '';
+    initial.model_b_model = settings.model_b_model || '';
+    initial.model_b_prompt = settings.model_b_prompt || '';
+    initial.model_b_temperature = settings.model_b_temperature ?? 0.7;
+    initial.helper_agent_provider = settings.helper_agent_provider || '';
+    initial.helper_agent_model = settings.helper_agent_model || '';
+    initial.helper_agent_prompt = settings.helper_agent_prompt || '';
+    initial.helper_agent_temperature = settings.helper_agent_temperature ?? 0.7;
     return initial;
   });
 
@@ -226,6 +295,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     if (changed.compare_model_a_name === '') changed.compare_model_a_name = null;
     if (changed.compare_model_b_name === '') changed.compare_model_b_name = null;
     if (changed.vllm_model === '') changed.vllm_model = null;
+    // Phase 4: empty-string → null for live model config fields
+    if (changed.model_a_provider === '') changed.model_a_provider = null;
+    if (changed.model_a_model === '') changed.model_a_model = null;
+    if (changed.model_a_prompt === '') changed.model_a_prompt = null;
+    if (changed.model_b_provider === '') changed.model_b_provider = null;
+    if (changed.model_b_model === '') changed.model_b_model = null;
+    if (changed.model_b_prompt === '') changed.model_b_prompt = null;
+    if (changed.helper_agent_provider === '') changed.helper_agent_provider = null;
+    if (changed.helper_agent_model === '') changed.helper_agent_model = null;
+    if (changed.helper_agent_prompt === '') changed.helper_agent_prompt = null;
 
     await onSave(changed);
     setSaving(false);
@@ -268,6 +347,32 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </section>
 
           <section>
+            <SectionTitle title="Karşılaştırma Modu" />
+            <div className="flex gap-2 py-1.5 px-1">
+              <button
+                onClick={() => setForm(p => ({ ...p, compare_mode: 'csv' }))}
+                className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all border ${
+                  form.compare_mode === 'csv'
+                    ? 'bg-primary text-primary-content border-primary shadow-sm'
+                    : 'bg-base-200 text-base-content/60 border-base-300 hover:text-base-content'
+                }`}
+              >
+                📁 CSV
+              </button>
+              <button
+                onClick={() => setForm(p => ({ ...p, compare_mode: 'live' }))}
+                className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all border ${
+                  form.compare_mode === 'live'
+                    ? 'bg-primary text-primary-content border-primary shadow-sm'
+                    : 'bg-base-200 text-base-content/60 border-base-300 hover:text-base-content'
+                }`}
+              >
+                ⚡ Canlı
+              </button>
+            </div>
+          </section>
+
+          <section>
             <SectionTitle title="1. Ek Açıklama" />
             <ChipSelector label="Duygu Öğeleri (Sentiment Elements)" key_="sentiment_elements"
               items={ALL_SENTIMENT_ELEMENTS} form={form} setForm={setForm} emptyLabel="En az bir öğe seçin" />
@@ -305,6 +410,21 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <TextRow label="Anthropic Anahtarı" key_="anthropic_key" form={form} setForm={setForm} placeholder="sk-ant-..." type="password" />
             <TextRow label="vLLM URL" key_="vllm_url" form={form} setForm={setForm} placeholder="http://localhost:8001/v1" />
             <NumberRow label="Few-Shot Örnek Sayısı" key_="n_few_shot" form={form} setForm={setForm} min={0} />
+          </section>
+
+          <section>
+            <SectionTitle title="3a. Model A (Canlı)" />
+            <ModelConfigSection title="Model A Yapılandırması" prefix="model_a" form={form} setForm={setForm} />
+          </section>
+
+          <section>
+            <SectionTitle title="3b. Model B (Canlı)" />
+            <ModelConfigSection title="Model B Yapılandırması" prefix="model_b" form={form} setForm={setForm} />
+          </section>
+
+          <section>
+            <SectionTitle title="3c. Yardımcı Asistan (Canlı)" />
+            <ModelConfigSection title="Helper Agent Yapılandırması" prefix="helper_agent" form={form} setForm={setForm} />
           </section>
 
           <section>

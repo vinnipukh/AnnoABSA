@@ -12,6 +12,7 @@ from services.llm_providers import (
     get_provider,
     _derive_provider,
     validate_provider_config,
+    validate_per_model_config,
     predict_llm,
     OllamaProvider,
     OpenAIProvider,
@@ -179,3 +180,87 @@ class TestValidateProviderConfig:
 
     def test_empty_string_provider(self):
         assert validate_provider_config("", {}) == []
+
+
+class TestValidatePerModelConfig:
+    """Tests for validate_per_model_config (Phase 4: Live Compare Mode)."""
+
+    def test_valid_model_a_config(self):
+        """Fully configured model_a returns no errors."""
+        config = {
+            "model_a_provider": "openai",
+            "model_a_model": "gpt-4o",
+            "openai_key": "sk-test",
+        }
+        assert validate_per_model_config("model_a", config) == []
+
+    def test_valid_model_b_config(self):
+        """Fully configured model_b returns no errors."""
+        config = {
+            "model_b_provider": "anthropic",
+            "model_b_model": "claude-sonnet-4",
+            "anthropic_key": "sk-ant-test",
+        }
+        assert validate_per_model_config("model_b", config) == []
+
+    def test_valid_helper_agent_config(self):
+        """Fully configured helper_agent returns no errors."""
+        config = {
+            "helper_agent_provider": "ollama",
+            "helper_agent_model": "gemma3:4b",
+        }
+        assert validate_per_model_config("helper_agent", config) == []
+
+    def test_missing_provider_returns_error(self):
+        """No provider set for model_a."""
+        config = {"model_a_model": "gpt-4o"}
+        errors = validate_per_model_config("model_a", config)
+        assert len(errors) >= 1
+        assert any("provider" in e.lower() for e in errors)
+
+    def test_missing_model_returns_error(self):
+        """No model set for model_a."""
+        config = {"model_a_provider": "openai", "openai_key": "sk-test"}
+        errors = validate_per_model_config("model_a", config)
+        assert len(errors) >= 1
+        assert any("model" in e.lower() for e in errors)
+
+    def test_both_missing_returns_two_errors(self):
+        """Neither provider nor model set."""
+        errors = validate_per_model_config("model_a", {})
+        assert len(errors) >= 2
+
+    def test_openai_provider_without_api_key_returns_error(self):
+        """Openai provider but no api key."""
+        config = {
+            "model_a_provider": "openai",
+            "model_a_model": "gpt-4o",
+        }
+        errors = validate_per_model_config("model_a", config)
+        assert len(errors) >= 1
+
+    def test_anthropic_provider_without_api_key_returns_error(self):
+        """Anthropic provider but no api key."""
+        config = {
+            "model_b_provider": "anthropic",
+            "model_b_model": "claude-sonnet-4",
+        }
+        errors = validate_per_model_config("model_b", config)
+        assert len(errors) >= 1
+
+
+class TestProviderTemperatureParam:
+    """Tests that all 4 provider adapters accept the temperature parameter."""
+
+    @pytest.mark.parametrize("provider_class,name,cfg", [
+        (OllamaProvider, "ollama", {}),
+        (OpenAIProvider, "openai", {"openai_key": "sk-test"}),
+        (AnthropicProvider, "anthropic", {"anthropic_key": "sk-ant-test"}),
+        (VLLMProvider, "vllm", {"vllm_url": "http://localhost:8001/v1"}),
+    ])
+    def test_predict_accepts_temperature_param(self, provider_class, name, cfg):
+        """predict() accepts temperature parameter without error (signature check, not invocation)."""
+        import inspect
+        sig = inspect.signature(provider_class(cfg).predict)
+        assert "temperature" in sig.parameters
+        assert sig.parameters["temperature"].default == 0.7
