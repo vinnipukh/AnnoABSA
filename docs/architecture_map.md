@@ -1,7 +1,7 @@
 # AnnoABSA — Architecture Map
 
 Purpose: let a coding agent orient without reading the whole codebase. This is the current
-(as-is) architecture after root reorganization. Line numbers are no longer included since
+(as-is) architecture after Phase 5 (main.py breakup). Line numbers are no longer included since
 code has been split into multiple files — verify against actual files before editing.
 
 ---
@@ -29,79 +29,68 @@ is no live IPC, no shared process, no re-invocation of `cli.py` logic from insid
 
 ---
 
-## 2. Backend module graph (post-reorganization)
+## 2. Backend module graph (after Phase 5 breakup)
 
-The backend was split from one monolithic `main.py` (~1750 lines) into six modules:
+The backend was broken up from one monolithic `main.py` (~1206 lines) into a thin launcher +
+9 focused modules:
 
 ```
-main.py  (residual — ~1053 lines)
-│  Global state: DATA_FILE_PATH, DATA_FILE_TYPE, CONFIG_PATH, CONFIG_DATA, AUTO_POSITIONS
-│  Data I/O: load_data(), save_data(), set_data_file(), set_config_file()
-│  Config: load_config(), set_config()
-│  Helper methods: get_total_count(), get_current_index(), max_number_of_idxs()
-│  Position logic: auto_add_missing_positions()
-|  Endpoints (11 in main.py, 4 in nlp router = 15 total):
-│    GET  /settings
-│    PATCH /settings
-│    GET  /data/{data_idx}
-│    POST /timing/{data_idx}
-│    POST /auto-add-positions
-│    GET  /avg-annotation-time
-│    POST /upload-data
-│    POST /review/{data_idx}/save
-│    GET  /ai_prediction/{data_idx}
-│    GET  /live_prediction/{data_idx}  — per-model live prediction (Phase 4)
-│    POST /agent/chat
+main.py  (thin launcher — ~50 lines)
+│  Re-exports from app/ modules for backward compat (cli.py, tests)
+│  Mounts 6 route routers: nlp, settings, reviews, ai, timing, upload
 │  Startup: startup_event()
 │
-├── services/nlp_helpers.py
-│    4 lazy-loaded NLP tools (first-use only, zero startup cost):
-│      get_sentinet()               — SentiNet lexicon from StarlangSoftware
-│      get_sentiment_classifier()   — BERT Turkish sentiment pipeline
-│      get_morphological_analyzer() — NlpToolkit FsmMorphologicalAnalyzer
-│      get_embedding_model()        — multilingual-e5-small SentenceTransformer
-│      get_lexicon()                — flattened {word: (polarity, score)} dict via WordNet
-│    Handlers:
-│      lexicon_polarity(text)       — per-word + aggregate polarity
-│      sentiment_classify(text)     — BERT label + confidence
-│      morphology(word)             — root, POS, inflectional groups
-│      embedding_similarity(sel, sent) — cosine similarity (0.0–1.0)
+├── app/config.py
+│     Global state: DATA_FILE_PATH, DATA_FILE_TYPE, CONFIG_PATH, CONFIG_DATA, AUTO_POSITIONS
+│     Functions: set_data_file(), set_config_file(), load_config(), set_config()
 │
-├── app/routes/nlp.py     (APIRouter, first production route file)
-│    4 NLP Helper Toolbar endpoints (lazy imports from services/nlp_helpers):
-│      GET /nlp/lexicon-polarity      — SentiNet per-word sentiment
-│      GET /nlp/sentiment             — BERT sentence-level sentiment
-│      GET /nlp/morphology            — NlpToolkit morphological analysis
-│      GET /nlp/embedding-similarity  — e5-small cosine similarity
+├── app/data.py
+│     Data I/O: load_data(), save_data(), parse_triplet_column(), _load_comparison_csv()
+│     Navigation: get_total_count(), get_current_index(), max_number_of_idxs()
+│
+├── app/positions.py
+│     Position logic: auto_add_missing_positions()
+│
+├── app/routes/settings.py     (APIRouter)
+│     GET  /settings
+│     PATCH /settings
+│
+├── app/routes/reviews.py      (APIRouter)
+│     GET  /data/{data_idx}
+│     POST /review/{data_idx}/save
+│     POST /agent/chat
+│
+├── app/routes/ai.py           (APIRouter)
+│     GET  /ai_prediction/{data_idx}
+│     GET  /live_prediction/{data_idx}
+│
+├── app/routes/timing.py       (APIRouter)
+│     POST /timing/{data_idx}
+│     GET  /avg-annotation-time
+│
+├── app/routes/upload.py       (APIRouter)
+│     POST /upload-data
+│     POST /auto-add-positions
+│
+├── app/routes/nlp.py          (APIRouter, Phase 3)
+│     GET  /nlp/lexicon-polarity
+│     GET  /nlp/sentiment
+│     GET  /nlp/morphology
+│     GET  /nlp/embedding-similarity
 │
 ├── models/schemas.py
-│     Pydantic models shared across endpoints:
-│       SaveTripletsRequest  — used by POST /review/{idx}/save
-│       AgentChatRequest     — used by POST /agent/chat
+│     Pydantic models: SaveTripletsRequest, AgentChatRequest
+│
+├── services/nlp_helpers.py
+│     4 lazy-loaded NLP tools (SentiNet, BERT, NlpToolkit, e5-small)
 │
 ├── services/prediction.py
-│     Prompt building and ABSA model generation (used by all providers):
-│       DEFAULT_LABELING_TEMPLATE  — Turkish labeling prompt
-│       DEFAULT_CHAT_TEMPLATE      — Turkish helper-agent prompt
-│       build_prediction_prompt()  — formats template + few-shot examples
-│       build_absa_models()        — creates dynamic Pydantic model + enums
-│       get_most_similar_examples() — BM25 retrieval (no Turkish stemming)
-│       find_valid_phrases_list()   — enumerate valid sub-phrases from text
-│       find_phrase_positions()     — locate phrase in text (exact then case-insensitive)
-│       generate_mock_reasoning()   — Turkish analysis paragraph (fallback)
+│     Templates, prompt builders, BM25 retrieval, position helpers
 │
 └── services/llm_providers.py
-      Provider adapters (each implements predict() + chat()):
-        OllamaProvider    — local via ollama Python lib
-        OpenAIProvider    — via openai Python lib, structured output
-        AnthropicProvider — via anthropic Python lib, JSON extraction from text
-        VLLMProvider      — via openai lib + custom base_url, manual JSON parse
-      Dispatch:
-        PROVIDER_REGISTRY — dict mapping name → class
-        get_provider()    — factory: name + config → instance
-        _derive_provider() — auto-detect provider from config keys
-      Backward compat:
-        predict_llm()     — wraps OllamaProvider, imported by evaluation/eval.py
+      Provider adapters: OllamaProvider, OpenAIProvider, AnthropicProvider, VLLMProvider
+      Dispatch: PROVIDER_REGISTRY, get_provider(), _derive_provider()
+      Validation: validate_provider_config(), validate_per_model_config()
 ```
 
 ### Data flow for a single review, end to end
@@ -123,7 +112,7 @@ CSV/JSON file (DATA_FILE_PATH)   ← same file, now updated
 ### AI prediction flow
 
 ```
-POST /ai_prediction/{idx}
+GET /ai_prediction/{idx}     (in app/routes/ai.py)
    │
    ├─ _derive_provider(CONFIG_DATA)  → determines which provider
    ├─ validate provider has required keys
@@ -136,7 +125,7 @@ POST /ai_prediction/{idx}
 ### Helper Agent flow
 
 ```
-POST /agent/chat
+POST /agent/chat             (in app/routes/reviews.py)
    │
    ├─ build system prompt from chat template (DEFAULT_CHAT_TEMPLATE)
    ├─ append last 4 turns of chat history
@@ -147,7 +136,7 @@ POST /agent/chat
 ### Live Prediction flow (Phase 4)
 
 ```
-GET /live_prediction/{idx}?role=model_a|model_b
+GET /live_prediction/{idx}?role=model_a|model_b    (in app/routes/ai.py)
    │
    ├─ validate_per_model_config(role, CONFIG_DATA)
    │    • provider and model must be non-None (no fallback)
@@ -166,15 +155,16 @@ GET /live_prediction/{idx}?role=model_a|model_b
 App.tsx  (single top-level component, owns ALL state — no state management library)
 │  state: currentIndex, reviewData, manualTriplets, chatMessages, isDark, mode, ...
 │  fetches: GET /data/{idx}, GET /settings, POST /review/{idx}/save
+│  keyboard shortcut: Ctrl+Shift+{key} configurable via Settings → ai_shortcut_key
 │
 ├─ components/ModelTripletColumn.tsx
 │     props: title, badgeText, triplets — GENERIC, renders any model's predictions
-│     with checkboxes for selection/deselection
+│     with checkboxes for selection/deselection, optional onRunPrediction for live mode
 │
 ├─ components/ManualInputForm.tsx
-│     props: text/onSubmit callbacks, manual triplet entry. Now has clickable
+│     props: text/onSubmit callbacks, manual triplet entry. Clickable
 │     character-level spans via useTextSelection hook (shared with PhraseAnnotator).
-│     Also exposes onSelectionChange for NLP toolbar. Used in Compare mode center column.
+│     Exposes onSelectionChange for NLP toolbar. Used in Compare mode center column.
 │
 ├─ components/PhraseAnnotator.tsx
 │     Click-to-select span annotator for Manual mode. Character-level rendering,
@@ -183,46 +173,43 @@ App.tsx  (single top-level component, owns ALL state — no state management lib
 │
 ├─ components/NlpHelperToolbar.tsx
 │     Collapsible floating toolbox: red toolbox icon (collapsed) → 4-segment card (expanded).
-│     Positioned fixed at bottom-center above the footer (not anchored to selection).
-│     Segments: Sözlük (lexicon, auto-fetches), Duygu Analizi / Yapı / Benzerlik
-│     (on-demand). Escape/click-outside to collapse. Mounted in App.tsx for both modes.
+│     Fixed at bottom-center above the footer. Segments: Sözlük, Duygu Analizi / Yapı / Benzerlik.
 │
 ├─ components/NlpHelperToolbar.test.tsx
 │     14 vitest tests: collapse/expand, auto-fetch lexicon, on-demand segments,
 │     error handling, Escape key, abort-on-unmount.
 │
 ├─ components/HelperAgentChatbox.tsx
-│     props: chat messages, send handler — floating panel, talks to POST /agent/chat
+│     props: chat messages, send handler, appActions ref — floating panel,
+│     talks to POST /agent/chat. Autopilot action registry via useRef.
 │
 ├─ components/CustomCheckbox.tsx        — generic, no app-specific logic
 ├─ components/AISuggestions.tsx         — AI suggestion list with accept/reject
-├─ components/SettingsPanel.tsx         — Settings modal, 5 sections
+├─ components/SettingsPanel.tsx         — Settings modal, 8 sections (incl. Phase 4/5)
 ├─ hooks/useTextSelection.ts            — shared native-drag selection hook
 │     Pure functions: getTokenBounds, cleanPhrase, getCleanedPositions
 │     Hook: reads window.getSelection() on mouseup, computes char offsets
 │     via DOM Range walking. Returns [state, actions]
 ├─ hooks/useDarkMode.ts                 — dark/light theme toggle
 ├─ phraseColoring.tsx                    — polarity→color mapping (25-color palette)
-└─ types.ts                              — TripletItem, ReviewComparisonData, ChatMessage
-      ReviewComparisonData.model_a_triplets / model_b_triplets
+└─ types.ts                              — TripletItem, ReviewComparisonData, ChatMessage,
+      AppActions (15 methods), Settings (with Phase 4/5 fields)
 ```
 
 **Key fact**: Selection uses native browser drag-to-select (mousedown → drag → mouseup).
 The hook reads `window.getSelection()` on mouseup and computes character offsets
 via DOM Range walking. Token snapping via `getTokenBounds()` expands to word
-boundaries. Runs are grouped by continuous background color — no
-per-character borders.
+boundaries.
 
 ---
 
-## 4. LLM-provider adapters (completed — not planned)
+## 4. LLM-provider adapters
 
-The port/adapter pattern described in the original Phase 1 brief is fully implemented.
-All four providers sit behind a common interface:
+The port/adapter pattern is fully implemented. All four providers sit behind a common interface
+defined in `services/llm_providers.py`.
 
 ### Interface (implicit, duck-typed)
 
-Each provider class implements:
 ```python
 def predict(self, text, considered_sentiment_elements, examples,
             aspect_categories, polarities, allow_implicit_aspect_terms,
@@ -230,61 +217,59 @@ def predict(self, text, considered_sentiment_elements, examples,
             prompt_template=None, temperature=0.7) -> (dict, list)
 ```
 
-And:
 ```python
 def chat(self, messages, model, temperature=0.7, max_tokens=300) -> str
 ```
 
-### Current implementations (in `services/llm_providers.py`)
+### Provider implementations
 
 | Provider | predict() method | chat() method | Key difference |
 |---|---|---|---|
 | `OllamaProvider` | `ollama.generate` with Pydantic `model_json_schema()` format | `ollama.chat()` | Structured output via schema |
 | `OpenAIProvider` | `client.beta.chat.completions.parse` with `response_format` | `client.chat.completions.create` | Native structured output |
-| `AnthropicProvider` | `client.messages.create`, parse JSON from text | Same, with format conversion | No structured output support; manual JSON extraction |
-| `VLLMProvider` | OpenAI client with custom `base_url`, standard completion + JSON parse | Same | No `beta.parse` support; thin wrapper around OpenAI API |
+| `AnthropicProvider` | `client.messages.create`, parse JSON from text | Same, with format conversion | No structured output support |
+| `VLLMProvider` | OpenAI client with custom `base_url`, standard completion + JSON parse | Same | No `beta.parse` support |
 
-### Dispatch (`_derive_provider` + `get_provider` factory)
+### Dispatch
 
-Both `get_ai_prediction` and `agent_chat` endpoints dispatch the same way:
-
-1. `_derive_provider(CONFIG_DATA)` — auto-detects from config keys:
-   - Explicit `llm_provider` → use it
-   - Exactly one of `openai_key`/`anthropic_key`/`vllm_url` set → derive to that
-   - Multiple set + no explicit → `ValueError`
-   - None set → `"ollama"`
+Both `get_ai_prediction` and `agent_chat` endpoints (in `app/routes/ai.py` and `app/routes/reviews.py`)
+dispatch the same way:
+1. `_derive_provider(CONFIG_DATA)` — auto-detects from config keys
 2. `get_provider(name, config)` — looks up `PROVIDER_REGISTRY` and instantiates
-3. `validate_provider_config(name, config)` — checks required keys are set;
-   called by both endpoints and `cli.py` at startup (replaces the triplicated
-   inline validation that previously existed in all three call sites).
+3. `validate_provider_config(name, config)` — checks required keys are set
 
 ---
 
 ## 5. File-to-task map
 
 | File(s) | What lives there | Task |
-|---|---|---|---|
-| `main.py` | Global state, data I/O, config functions, 11 HTTP endpoints, startup event, validate_per_model_config import | Residual / Phase 2 Task 2, Phase 4 Task 1 |
+|---|---|---|
+| `main.py` | Thin launcher: imports + mounts routers, startup event | Phase 5 (was 1206 lines → 50 lines) |
+| `app/config.py` | Global state + config functions | Phase 5 |
+| `app/data.py` | Data I/O + navigation helpers | Phase 5 |
+| `app/positions.py` | Position auto-fill logic | Phase 5 |
+| `app/routes/settings.py` | GET/PATCH /settings | Phase 5 |
+| `app/routes/reviews.py` | Data, save, agent chat endpoints | Phase 5 |
+| `app/routes/ai.py` | AI prediction + live prediction endpoints | Phase 5 |
+| `app/routes/timing.py` | Timing + avg annotation time endpoints | Phase 5 |
+| `app/routes/upload.py` | Upload data + auto-add-positions endpoints | Phase 5 |
+| `app/routes/nlp.py` | 4 NLP Helper Toolbar endpoints | Phase 3 |
 | `models/schemas.py` | SaveTripletsRequest, AgentChatRequest | Step 2 of root reorg |
-| `services/prediction.py` | Templates, prompt builders, BM25 retrieval, position helpers | Step 4 of root reorg |
-| `services/llm_providers.py` | 4 provider adapter classes, registry, factory, _derive_provider, predict_llm, validate_provider_config, validate_per_model_config | Task 3 + Step 3 of root reorg + Phase 4 Task 1 |
-| `services/nlp_helpers.py` | 4 lazy-loaded NLP tools + 4 handler functions | Phase 3 Task 1 (new) |
-| `app/routes/nlp.py` | APIRouter with 4 NLP endpoints (first production route file) | Phase 3 Task 1 (new) |
-| `cli.py` | Argparse, config management, start_backend/start_frontend, STD format conversion, Phase 4 default config keys | Tasks 1, 3, 4 + Phase 4 Task 4 |
-| `frontend/src/App.tsx` | Top-level layout, mode toggle, chat toggle, NLP toolbar state, state management | Tasks 2, 5 + P3T1 |
-| `frontend/src/types.ts` | TripletItem, ReviewComparisonData with model_a/b naming | Task 2 |
-| `frontend/src/components/PhraseAnnotator.tsx` | Click-to-select span annotator (uses useTextSelection hook) | Task 5 + Phase 3 Task 1 |
-| `frontend/src/components/ManualInputForm.tsx` | Clickable text + manual triplet form (uses useTextSelection hook) | Phase 3 Task 1 (reworked) |
-| `frontend/src/components/ModelTripletColumn.tsx` | Generic comparison column | Task 2 (consumer only) |
-| `frontend/src/components/NlpHelperToolbar.tsx` | Collapsible floating toolbox: red toolbox icon, 4 segments, auto/on-demand fetches | Phase 3 Task 3 |
-| `frontend/src/components/NlpHelperToolbar.test.tsx` | 14 vitest tests for toolbar component | Phase 3 Task 3 |
-| `frontend/src/components/AISuggestions.tsx` | AI suggestion list with accept/reject | Phase 2 Task 1 |
-| `frontend/src/components/SettingsPanel.tsx` | Settings modal with 5 sections | Phase 2 Task 2 |
-| `frontend/src/components/HelperAgentChatbox.tsx` | Floating chat panel | Unchanged |
-| `frontend/src/hooks/useTextSelection.ts` | Shared native-drag selection hook | Phase 3 Task 2 |
-| `frontend/src/hooks/useTextSelection.test.ts` | 13 vitest tests for pure functions | Phase 3 Task 2 |
-| `evaluation/eval.py` | Standalone evaluation script | Imports predict_llm from services/llm_providers |
-| `evaluation/eval_exc.py` | Multi-process eval launcher | Unchanged |
+| `services/prediction.py` | Templates, prompt builders, BM25, position helpers | Phase 1-2 |
+| `services/llm_providers.py` | 4 providers, registry, dispatch, validation | Phase 1-4 |
+| `services/nlp_helpers.py` | 4 lazy-loaded NLP tools | Phase 3 |
+| `cli.py` | Argparse, config, subprocess management, STD conversion | Phase 1-5 |
+| `frontend/src/App.tsx` | Layout, mode toggle, chat, NLP toolbar state, AppActions, keyboard shortcuts | Phases 2-5 |
+| `frontend/src/types.ts` | TripletItem, Settings, AppActions interfaces | Phases 2-5 |
+| `frontend/src/components/SettingsPanel.tsx` | Settings modal, 8 sections | Phases 2-5 |
+| `frontend/src/components/ModelTripletColumn.tsx` | Generic comparison column with Run button | Phase 2-4 |
+| `frontend/src/components/HelperAgentChatbox.tsx` | Chat panel (emoji → SVG pending) | Phase 2 |
+| `frontend/src/components/NlpHelperToolbar.tsx` | Toolbox (emoji → SVG pending) | Phase 3 |
+| `frontend/src/components/AISuggestions.tsx` | AI suggestion list | Phase 2 |
+| `frontend/src/hooks/useTextSelection.ts` | Drag selection hook | Phase 3 |
+| `tests/test_live_prediction.py` | 19 endpoint tests for live prediction | Phase 4 |
+| `tests/test_smoke.py` | 4 compile-only smoke tests | Phase 5 |
+| `evaluation/eval.py` | Standalone eval script | Phase 1 |
 
 ---
 
@@ -304,16 +289,18 @@ Both `get_ai_prediction` and `agent_chat` endpoints dispatch the same way:
   Don't assume more few-shot examples will help without fixing this first.
 - **`aspect_category`/`sentiment_polarity` values stay in English** — confirmed user decision,
   not an oversight. Don't translate them anywhere.
-- **Template constants are duplicated** between `services/prediction.py` and `cli.py`
-  (CLI can't import from prediction.py without triggering FastAPI import-time side effects).
-  Keep both copies in sync.
+- **Template constants are imported as aliases** in `cli.py` from `services/prediction`.
+  Never copy-paste the template string — the import-based dedup keeps them in sync.
 - **`get_live_prediction` reads per-model config from `CONFIG_DATA`, not `load_config()`**
-  The live prediction endpoint uses `CONFIG_DATA.get(f"{role}_provider")` directly rather than
-  `load_config().get(...)`. This ensures settings panel `PATCH /settings` updates take effect
-  immediately. The existing `get_ai_prediction` endpoint uses `load_config()` for some reads
-  and `CONFIG_DATA` for others — both work when a config file is active, but in tests you
-  must mutate `CONFIG_DATA`, not mock `load_config()`.
-- **`predict()` now accepts `temperature=0.7`** — all 4 provider adapters and the `predict_llm()`
-  wrapper accept this parameter. The default is 0.7 (was hardcoded 0.0).
-- **`validate_per_model_config()`** — Phase 4 validation function in `services/llm_providers.py`.
-  Checks per-model config completeness. Called by `get_live_prediction()`.
+  The live prediction endpoint uses `CONFIG_DATA.get(f"{role}_provider")` directly.
+- **`predict()` now accepts `temperature=0.7`** — all 4 providers accept this parameter.
+- **`validate_per_model_config()`** — checks per-model config completeness in `services/llm_providers.py`.
+- **After Phase 5 breakup, `main.py` re-exports from `app/` modules.** `import main; main.CONFIG_DATA`
+  still works because `from app.config import *` is in `main.py`. Tests that mutate
+  `main.CONFIG_DATA["key"] = val` still work — they're mutating the same dict object.
+- **Route file imports are inconsistent.** `app/routes/settings.py` correctly imports from `app.config` and `app.data`. However, `app/routes/ai.py`, `app/routes/reviews.py`, `app/routes/timing.py`, and `app/routes/upload.py` use `import main` then access `main.CONFIG_DATA`, `main.load_data()`, etc. This works (main.py re-exports everything) but violates the clean layering — it's a Phase 6 fix item. If adding a new route file, always import from `app.config` and `app.data` directly, not from `main`.
+- **`requirements.txt` was deleted** in Phase 5. Use `pyproject.toml` as the single source
+  of truth for dependencies. Run `pip install -e .` to install.
+- **The `annoabsa` entry-point shim was deleted** in Phase 5. Use `python cli.py` to run.
+- **`temp_absa_config.json` now lives in `temp/` directory**, not the project root.
+  The `temp/` directory is gitignored and created at runtime.

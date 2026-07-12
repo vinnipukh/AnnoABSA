@@ -91,6 +91,7 @@ const DEFAULT_SETTINGS: Settings = {
   model_a_provider: null, model_a_model: null, model_a_prompt: null, model_a_temperature: 0.7,
   model_b_provider: null, model_b_model: null, model_b_prompt: null, model_b_temperature: 0.7,
   helper_agent_provider: null, helper_agent_model: null, helper_agent_prompt: null, helper_agent_temperature: 0.7,
+  ai_shortcut_key: 'a',
 };
 
 export default function App() {
@@ -225,6 +226,7 @@ export default function App() {
           helper_agent_model: s.helper_agent_model ?? null,
           helper_agent_prompt: s.helper_agent_prompt ?? null,
           helper_agent_temperature: s.helper_agent_temperature ?? 0.7,
+          ai_shortcut_key: s.ai_shortcut_key ?? 'a',
         });
         setEnablePrePrediction(s.enable_pre_prediction === true);
         setDisableAiAutomaticPrediction(s.disable_ai_automatic_prediction === true);
@@ -412,8 +414,9 @@ export default function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+Shift+A (or Cmd+Shift+A) → trigger AI prediction
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'a' || e.key === 'A')) {
+      // Ctrl+Shift+{key} (or Cmd+Shift+{key}) → trigger AI prediction
+      const shortcutKey = (settings.ai_shortcut_key || 'a').toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key.toLowerCase() === shortcutKey)) {
         e.preventDefault();
         if (enablePrePrediction && !isAIPredicting) {
           fetchAIPredictionRef.current();
@@ -573,7 +576,7 @@ export default function App() {
                   ? 'bg-success/20 text-success border-success/30 hover:bg-success/30'
                   : 'bg-base-200 text-base-content/50 border-base-300 hover:text-primary hover:border-primary/40'
               }`}
-              title={isAIPredicting ? 'AI tahmin ediyor...' : 'AI Önerisi Al (Ctrl+Shift+A)'}>
+              title={isAIPredicting ? 'AI tahmin ediyor...' : `AI Önerisi Al (Ctrl+Shift+${(settings.ai_shortcut_key || 'A').toUpperCase()})`}>
               {isAIPredicting ? (
                 <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               ) : (

@@ -12,18 +12,25 @@ reference, and `tests/testcases.md` for the regression baseline.
 ## Stack
 
 - **Backend**: Python (3.11), FastAPI, pandas, rank-bm25, ollama, openai, anthropic.
-  - `main.py` (~1206 lines) — global state, data I/O, all 11 HTTP endpoints, startup.
-  - `services/prediction.py` — prompt building, BM25 retrieval, position helpers, template constants.
-  - `services/llm_providers.py` — 4 provider adapters (OllamaProvider, OpenAIProvider, AnthropicProvider, VLLMProvider) + registry + dispatch + per-model config validation (`validate_per_model_config`).
-  - `services/nlp_helpers.py` — NLP Helper Toolbar: 4 lazy-loaded tools (SentiNet, BERT, NlpToolkit, e5-small).
-  - `app/routes/nlp.py` — APIRouter with 4 NLP endpoints (lexicon-polarity, sentiment, morphology, embedding-similarity).
+  - `main.py` (~50 lines) — thin launcher: imports from `app/` modules, mounts 6 route routers, startup event.
+  - `app/config.py` — global state (`DATA_FILE_PATH`, `CONFIG_DATA`, etc.) + config functions.
+  - `app/data.py` — data I/O (`load_data`, `save_data`, `parse_triplet_column`) + navigation helpers.
+  - `app/positions.py` — position auto-fill logic (`auto_add_missing_positions`).
+  - `app/routes/settings.py` — GET/PATCH /settings.
+  - `app/routes/reviews.py` — GET /data/{idx}, POST /review/{idx}/save, POST /agent/chat.
+  - `app/routes/ai.py` — GET /ai_prediction/{idx}, GET /live_prediction/{idx}.
+  - `app/routes/timing.py` — POST /timing/{idx}, GET /avg-annotation-time.
+  - `app/routes/upload.py` — POST /upload-data, POST /auto-add-positions.
+  - `app/routes/nlp.py` — APIRouter with 4 NLP endpoints (Phase 3).
   - `models/schemas.py` — Pydantic models (SaveTripletsRequest, AgentChatRequest).
+  - `services/prediction.py` — prompt building, BM25 retrieval, position helpers, template constants.
+  - `services/llm_providers.py` — 4 provider adapters + registry + dispatch + validation.
+  - `services/nlp_helpers.py` — NLP Helper Toolbar: 4 lazy-loaded tools.
   - `cli.py` — argparse-based launcher, starts backend + frontend as subprocesses.
-  - `tests/test_live_prediction.py` — Phase 4 Live Compare Mode endpoint tests.
 - **Frontend**: React + TypeScript, Vite, Tailwind (`frontend/src/`).
-- **Data storage**: CSV or JSON, loaded/saved via `load_data()`/`save_data()` in `main.py`.
+- **Data storage**: CSV or JSON, loaded/saved via `load_data()`/`save_data()` in `app/data.py`.
   File type is auto-detected from extension.
-- **Tests**: pytest in `tests/` (124 tests), manual walkthrough in `tests/testcases.md`.
+- **Tests**: pytest in `tests/` (128 tests), manual walkthrough in `tests/testcases.md`.
 
 ---
 
@@ -58,7 +65,7 @@ Supported column combinations:
 | Columns | Source | Notes |
 |---|---|---|
 | `review_text` only + `label` | Any file | After annotation, saved triplets go into `label` as JSON array. |
-| `review_text`, `aspect_triplets`, `new_triplets`, `reasoning` | Old inline-column format | `aspect_triplets` maps to Model A, `new_triplets` to Model B. Both parsed via `parse_triplet_column()` which handles STD tuples `[('term','CAT','pol')]` and STD lists `[['term','CAT','pol']]`. Backward-compat — ~10 lines of code in `main.py`'s `get_data()`. Example: `evaluation/data/semevaltr/semeval_train_deepseek_relabeled.csv`. |
+| `review_text`, `aspect_triplets`, `new_triplets`, `reasoning` | Old inline-column format | `aspect_triplets` maps to Model A, `new_triplets` to Model B. Both parsed via `parse_triplet_column()` in `app/data.py`. |
 | `review_text` only + `--compare-model-a-csv` + `--compare-model-b-csv` | Current pattern | External CSVs override inline columns. See "How to run" below. |
 
 ### Label JSON schema (saved to CSV/JSON after annotation)
@@ -95,7 +102,7 @@ Added to the JSON config file and settings panel:
 | `model_a_model` | `str\|None` | `None` | Model name for Model A |
 | `model_a_prompt` | `str\|None` | `DEFAULT_LABELING_TEMPLATE` | Prompt template for Model A |
 | `model_a_temperature` | `float` | `0.7` | Temperature for Model A |
-| `model_b_provider` | `str\|None` | `None` | Provider for Model B live predictions |
+| `model_b_provider` | `str\|None` | `None` | Provider for Model B |
 | `model_b_model` | `str\|None` | `None` | Model name for Model B |
 | `model_b_prompt` | `str\|None` | `DEFAULT_LABELING_TEMPLATE` | Prompt template for Model B |
 | `model_b_temperature` | `float` | `0.7` | Temperature for Model B |
@@ -182,7 +189,7 @@ Requires the chosen LLM providers to be running (Ollama server, API keys configu
 ### Running tests
 
 ```bash
-pytest tests/          # 124 automated tests
+pytest tests/          # 128 automated tests
 ```
 
 Manual walkthrough: `tests/testcases.md` requires a running backend + frontend + browser.

@@ -102,6 +102,8 @@ def load_config():
         "helper_agent_model": None,
         "helper_agent_prompt": DEFAULT_CHAT_TEMPLATE,
         "helper_agent_temperature": 0.7,
+        # Phase 5: configurable keyboard shortcut
+        "ai_shortcut_key": "a",
     }
 
 

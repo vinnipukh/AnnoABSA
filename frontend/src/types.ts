@@ -90,6 +90,7 @@ export interface Settings {
   helper_agent_model: string | null;
   helper_agent_prompt: string | null;
   helper_agent_temperature: number;
+  ai_shortcut_key: string;
 }
 
 /**

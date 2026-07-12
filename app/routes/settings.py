@@ -54,6 +54,7 @@ def get_settings():
         "helper_agent_model": CONFIG_DATA.get("helper_agent_model", None),
         "helper_agent_prompt": CONFIG_DATA.get("helper_agent_prompt", None),
         "helper_agent_temperature": CONFIG_DATA.get("helper_agent_temperature", 0.7),
+        "ai_shortcut_key": CONFIG_DATA.get("ai_shortcut_key", "a"),
         "current_index": get_current_index(),
         "max_number_of_idxs": max_number_of_idxs()
     }

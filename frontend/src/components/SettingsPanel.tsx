@@ -408,6 +408,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <ToggleRow label="Otomatik AI tahminini devre dışı bırak" key_="disable_ai_automatic_prediction" form={form} setForm={setForm} />
               <ToggleRow label="Yardımcı Asistanı etkinleştir" key_="enable_helper_agent" form={form} setForm={setForm} />
             </div>
+            <TextRow label="AI Kısayol Tuşu (Ctrl+Shift+...)" key_="ai_shortcut_key" form={form} setForm={setForm} placeholder="a" />
             <SelectRow label="LLM Sağlayıcı" key_="llm_provider" form={form} setForm={setForm}
               options={[
                 { value: 'ollama', label: 'Ollama (yerel)' },
