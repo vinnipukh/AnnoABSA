@@ -91,6 +91,10 @@ export interface Settings {
   helper_agent_prompt: string | null;
   helper_agent_temperature: number;
   ai_shortcut_key: string;
+  // Phase 6: Custom OpenAI-compatible API provider
+  custom_openai_url: string | null;
+  custom_openai_key: string | null;
+  custom_openai_model: string | null;
 }
 
 /**

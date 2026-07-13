@@ -8,6 +8,8 @@ import { AISuggestions, AiSuggestionItem } from './components/AISuggestions';
 import { SettingsPanel } from './components/SettingsPanel';
 import { EditReviewTextModal } from './components/EditReviewTextModal';
 import { NlpHelperToolbar } from './components/NlpHelperToolbar';
+import { WelcomeOverlay } from './components/WelcomeOverlay';
+import { ActiveLearningSuggestions } from './components/ActiveLearningSuggestions';
 
 const FALLBACK_DATA: ReviewComparisonData[] = [
   {
@@ -92,6 +94,8 @@ const DEFAULT_SETTINGS: Settings = {
   model_b_provider: null, model_b_model: null, model_b_prompt: null, model_b_temperature: 0.7,
   helper_agent_provider: null, helper_agent_model: null, helper_agent_prompt: null, helper_agent_temperature: 0.7,
   ai_shortcut_key: 'a',
+  // Phase 6: Custom OpenAI-compatible API provider
+  custom_openai_url: null, custom_openai_key: null, custom_openai_model: null,
 };
 
 export default function App() {
@@ -118,6 +122,7 @@ export default function App() {
   const [aiTriggeredForIndex, setAiTriggeredForIndex] = useState(false);
   const [enablePrePrediction, setEnablePrePrediction] = useState(false);
   const [disableAiAutomaticPrediction, setDisableAiAutomaticPrediction] = useState(false);
+  const [showLearningPanel, setShowLearningPanel] = useState(false);
   const aiAbortRef = useRef<AbortController | null>(null);
 
   // NLP Toolbar state
@@ -227,6 +232,9 @@ export default function App() {
           helper_agent_prompt: s.helper_agent_prompt ?? null,
           helper_agent_temperature: s.helper_agent_temperature ?? 0.7,
           ai_shortcut_key: s.ai_shortcut_key ?? 'a',
+          custom_openai_url: s.custom_openai_url ?? null,
+          custom_openai_key: s.custom_openai_key ?? null,
+          custom_openai_model: s.custom_openai_model ?? null,
         });
         setEnablePrePrediction(s.enable_pre_prediction === true);
         setDisableAiAutomaticPrediction(s.disable_ai_automatic_prediction === true);
@@ -586,6 +594,15 @@ export default function App() {
               )}
             </button>
           )}
+          <button onClick={() => setShowLearningPanel(p => !p)}
+            className={`p-1.5 rounded-lg transition-all border ${
+              showLearningPanel ? 'bg-warning/20 text-warning border-warning/30' : 'bg-base-200 text-base-content/50 border-base-300 hover:text-warning hover:border-warning/40'
+            }`}
+            title={showLearningPanel ? 'Aktif Öğrenme Panelini Kapat' : 'Aktif Öğrenme Önerileri'}>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+          </button>
           <input ref={fileInputRef} type="file" accept=".csv,.json" onChange={handleFileUpload} className="hidden" />
           <button onClick={() => fileInputRef.current?.click()}
             className="p-1.5 rounded-lg bg-base-200 hover:bg-base-300 text-base-content/60 hover:text-base-content transition-colors border border-base-300"
@@ -672,6 +689,15 @@ export default function App() {
         </section>
       </main>
 
+      {showLearningPanel && (
+        <div className="fixed bottom-14 left-1/2 -translate-x-1/2 w-full max-w-lg z-40">
+          <ActiveLearningSuggestions
+            backendUrl={backendUrl}
+            onNavigate={(idx) => { setCurrentIndex(idx); setShowLearningPanel(false); }}
+          />
+        </div>
+      )}
+
       {settings.enable_helper_agent && showFloatingChat && (
         <HelperAgentChatbox
           initialReasoning={currentData.agent_initial_reasoning}
@@ -729,6 +755,12 @@ export default function App() {
           onClose={() => setNlpToolbarSelection(null)}
         />
       )}
+
+      <WelcomeOverlay
+        totalCount={totalCount}
+        onUpload={() => fileInputRef.current?.click()}
+        onStart={() => {}}
+      />
     </div>
   );
 }

@@ -39,6 +39,7 @@ DEFAULT_CHAT_TEMPLATE = (
     'Şu incelemeyi tartışıyorsunuz: "{review_text}". '
     '{model_a_name} tripletleri: {model_a_triplets}, '
     '{model_b_name} tripletleri: {model_b_triplets}. '
+    'Benzer etiketlenmiş örnekler:\n{few_shot_examples}\n'
     "Kullanıcıya mantıklı, akıl yürüterek açıklama yap."
 )
 

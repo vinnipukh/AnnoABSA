@@ -157,6 +157,7 @@ const PROVIDER_OPTIONS = [
   { value: 'openai', label: 'OpenAI' },
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'vllm', label: 'vLLM' },
+  { value: 'custom_openai', label: 'Custom OpenAI' },
 ];
 
 function ModelConfigSection({ title, prefix, form, setForm }: {
@@ -238,6 +239,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     initial.openai_key = settings.openai_key || '';
     initial.anthropic_key = settings.anthropic_key || '';
     initial.vllm_url = settings.vllm_url || '';
+    initial.custom_openai_url = settings.custom_openai_url || '';
+    initial.custom_openai_key = settings.custom_openai_key || '';
+    initial.custom_openai_model = settings.custom_openai_model || '';
     initial.n_few_shot = settings.n_few_shot ?? 10;
     initial.compare_model_a_name = settings.compare_model_a_name || '';
     initial.compare_model_b_name = settings.compare_model_b_name || '';
@@ -311,6 +315,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     if (changed.helper_agent_provider === '') changed.helper_agent_provider = null;
     if (changed.helper_agent_model === '') changed.helper_agent_model = null;
     if (changed.helper_agent_prompt === '') changed.helper_agent_prompt = null;
+    if (changed.custom_openai_url === '') changed.custom_openai_url = null;
+    if (changed.custom_openai_key === '') changed.custom_openai_key = null;
+    if (changed.custom_openai_model === '') changed.custom_openai_model = null;
 
     await onSave(changed);
     setSaving(false);
@@ -415,6 +422,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 { value: 'openai', label: 'OpenAI' },
                 { value: 'anthropic', label: 'Anthropic' },
                 { value: 'vllm', label: 'vLLM' },
+                { value: 'custom_openai', label: 'Custom OpenAI' },
               ]}
             />
             <TextRow label="LLM Modeli" key_="llm_model" form={form} setForm={setForm} placeholder="gemma3:4b" />
@@ -422,6 +430,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <TextRow label="OpenAI Anahtarı" key_="openai_key" form={form} setForm={setForm} placeholder="sk-..." type="password" />
             <TextRow label="Anthropic Anahtarı" key_="anthropic_key" form={form} setForm={setForm} placeholder="sk-ant-..." type="password" />
             <TextRow label="vLLM URL" key_="vllm_url" form={form} setForm={setForm} placeholder="http://localhost:8001/v1" />
+            <TextRow label="Custom OpenAI URL" key_="custom_openai_url" form={form} setForm={setForm} placeholder="https://api.deepseek.com" />
+            <TextRow label="Custom OpenAI Anahtarı" key_="custom_openai_key" form={form} setForm={setForm} placeholder="sk-..." type="password" />
+            <TextRow label="Custom OpenAI Modeli" key_="custom_openai_model" form={form} setForm={setForm} placeholder="deepseek-v4-flash" />
             <NumberRow label="Few-Shot Örnek Sayısı" key_="n_few_shot" form={form} setForm={setForm} min={0} />
           </section>
 

@@ -16,17 +16,17 @@ How to use: pick a task, read `CONTRIBUTING.md` for the workflow, then go.
 | 🟢 | Logo color — SVG "A" white on `bg-primary` | Frontend | Easy | Phase 5 |
 | 🟢 | Keyboard shortcut (Ctrl+Shift+{key}, configurable in Settings) | Frontend | Easy | Phase 5 |
 | 🟢 | Smoke tests — 4 compile-only checks | Backend | Medium | Phase 5 |
-| 🔴 | **Phase 6: Polish & Features** — see phase6_plan.md | Both | Various | TBD |
-| 🔴 | Emoji → SVG in HelperAgentChatbox (`🤖`) and NlpHelperToolbar (`📖🤖🔧📊😊😞😐`) | Frontend | Easy | `HelperAgentChatbox.tsx`, `NlpHelperToolbar.tsx` |
-| 🔴 | Fix TSConfig — add `"vite/client"` to tsconfig types to eliminate pre-existing `env` error | Frontend | Easy | `frontend/tsconfig.json` |
-| 🔴 | Frontend component tests for SettingsPanel, ModelTripletColumn, HelperAgentChatbox | Frontend | Medium | New `.test.tsx` files |
-| 🔴 | CLI flags for Phase 4 Live Compare config (`--model-a-provider`, etc.) | Backend | Easy | `cli.py` |
-| 🔴 | Autopilot mode — response parser in HelperAgentChatbox (hybrid text + action directives) | Both | Hard | `HelperAgentChatbox.tsx`, `agent_chat()` |
-| 🔴 | RAG extension — add BM25 few-shot retrieval to Helper Agent chat | Backend | Easy | `app/routes/reviews.py`, `services/prediction.py` |
-| 🔴 | Active learning ML triplet suggestions — TF-IDF + Logistic Regression uncertainty sampling | Backend | Hard | `services/active_learning.py` (new), `app/routes/learning.py` (new), `scikit-learn` |
-| 🔴 | Fix route files importing from `import main` instead of `app.config`/`app.data` | Backend | Easy | `app/routes/ai.py`, `app/routes/reviews.py` |
-| 🔴 | Break up `cli.py` (~962 lines) — extract config/argparse/subprocess into separate modules | Backend | Medium | `cli.py` → new modules |
-| 🔴 | Clean up `pyproject.toml` — check for stale `[project.scripts]` entry pointing to deleted `annoabsa` | Backend | Easy | `pyproject.toml` |
+| 🟢 | **Phase 6: Polish & Features** — see phase6_plan.md | Both | Various | TBD |
+| 🟢 | Emoji → SVG in HelperAgentChatbox (`🤖`) and NlpHelperToolbar (`📖🤖🔧📊😊😞😐`) | Frontend | Easy | `HelperAgentChatbox.tsx`, `NlpHelperToolbar.tsx` |
+| 🟢 | Fix TSConfig — add `"vite/client"` to tsconfig types to eliminate pre-existing `env` error | Frontend | Easy | `frontend/tsconfig.json` |
+| 🟢 | Frontend component tests for SettingsPanel, ModelTripletColumn, HelperAgentChatbox | Frontend | Medium | New `.test.tsx` files |
+| 🟢 | CLI flags for Phase 4 Live Compare config (`--model-a-provider`, etc.) | Backend | Easy | `cli.py` |
+| 🟢 | Autopilot mode — response parser in HelperAgentChatbox (hybrid text + action directives) | Both | Hard | `HelperAgentChatbox.tsx`, `agent_chat()` |
+| 🟢 | RAG extension — add BM25 few-shot retrieval to Helper Agent chat | Backend | Easy | `app/routes/reviews.py`, `services/prediction.py` |
+| 🟢 | Active learning ML triplet suggestions — TF-IDF + Logistic Regression uncertainty sampling | Backend | Hard | `services/active_learning.py` (new), `app/routes/learning.py` (new), `scikit-learn` |
+| 🟢 | Fix route files importing from `import main` instead of `app.config`/`app.data` | Backend | Easy | `app/routes/ai.py`, `app/routes/reviews.py` |
+| 🟢 | Break up `cli.py` (~962 lines) — extract config/argparse/subprocess into separate modules | Backend | Medium | `cli.py` → new modules |
+| 🟢 | Clean up `pyproject.toml` — check for stale `[project.scripts]` entry pointing to deleted `annoabsa` | Backend | Easy | `pyproject.toml` |
 
 ---
 

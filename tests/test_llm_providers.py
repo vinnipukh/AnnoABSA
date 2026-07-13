@@ -25,7 +25,7 @@ class TestProviderRegistry:
     """Tests for PROVIDER_REGISTRY dict."""
 
     def test_all_four_providers_registered(self):
-        assert set(PROVIDER_REGISTRY.keys()) == {"ollama", "openai", "anthropic", "vllm"}
+        assert set(PROVIDER_REGISTRY.keys()) == {"ollama", "openai", "anthropic", "vllm", "custom_openai"}
 
     def test_ollama_class(self):
         assert PROVIDER_REGISTRY["ollama"] is OllamaProvider

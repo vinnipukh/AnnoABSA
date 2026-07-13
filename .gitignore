@@ -67,3 +67,6 @@ app/*.py[cod]
 # ── Agent / tooling ──────────────────────────
 .agentbridge/
 guidelines.pdf
+*.bak
+.hermes/
+temp/

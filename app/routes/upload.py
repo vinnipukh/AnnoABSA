@@ -1,6 +1,7 @@
 """Upload endpoints — POST /upload-data, POST /auto-add-positions."""
 from fastapi import APIRouter, HTTPException, UploadFile, File
-import main
+from app.config import set_data_file
+from app.data import load_data
 from app.positions import auto_add_missing_positions
 import os
 import time
@@ -31,10 +32,10 @@ async def upload_data(file: UploadFile = File(...)):
     with open(dest, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    main.set_data_file(dest)
+    set_data_file(dest)
 
     try:
-        data = main.load_data()
+        data = load_data()
         count = len(data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading uploaded file: {e}")

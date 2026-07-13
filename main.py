@@ -14,6 +14,7 @@ from app.routes.reviews import router as reviews_router
 from app.routes.ai import router as ai_router
 from app.routes.timing import router as timing_router
 from app.routes.upload import router as upload_router
+from app.routes.learning import router as learning_router
 
 app = FastAPI()
 
@@ -31,6 +32,7 @@ app.include_router(reviews_router)
 app.include_router(ai_router)
 app.include_router(timing_router)
 app.include_router(upload_router)
+app.include_router(learning_router)
 
 
 @app.on_event("startup")

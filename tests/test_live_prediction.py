@@ -73,12 +73,15 @@ def app(csv_path):
 
     # Import main after env is set
     import main
+    from app.config import CONFIG_DATA as _cfg
 
     # Ensure the data file is properly set
     main.DATA_FILE_PATH = csv_path
     main.DATA_FILE_TYPE = "csv"
-    # Seed with few-shot example on row 1
-    main.CONFIG_DATA = {
+    # Seed with few-shot example on row 1 — mutate in-place so
+    # app.config.CONFIG_DATA (imported by route files) stays in sync
+    _cfg.clear()
+    _cfg.update({
         "sentiment_elements": ["aspect_term", "aspect_category", "sentiment_polarity", "opinion_term"],
         "sentiment_polarity_options": ["positive", "negative", "neutral"],
         "aspect_categories": ["AMBIENCE#GENERAL", "SERVICE#GENERAL", "FOOD#QUALITY"],
@@ -88,7 +91,7 @@ def app(csv_path):
         "n_few_shot": 3,
         "llm_provider": "ollama",
         "llm_model": "gemma3:4b",
-    }
+    })
     client = TestClient(main.app)
     return client
 

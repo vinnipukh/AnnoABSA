@@ -1,6 +1,7 @@
 """Timing endpoints — POST /timing/{idx}, GET /avg-annotation-time."""
 from fastapi import APIRouter, HTTPException
-import main
+from app.config import DATA_FILE_PATH, DATA_FILE_TYPE
+from app.data import load_data, save_data
 import json
 
 router = APIRouter(tags=["timing"])
@@ -10,17 +11,17 @@ router = APIRouter(tags=["timing"])
 def post_timing(data_idx: int, timing: dict):
     """Store timing information for a data item (appended to a list)."""
     try:
-        data = main.load_data()
+        data = load_data()
         if data_idx >= len(data) or data_idx < 0:
             raise HTTPException(status_code=404, detail="Index out of range")
         timing_entry = {"duration": timing.get(
             "duration", 0), "change": timing.get("change", False)}
-        if main.DATA_FILE_TYPE == "json":
+        if DATA_FILE_TYPE == "json":
             item = data[data_idx]
             if "timings" not in item or not isinstance(item["timings"], list):
                 item["timings"] = []
             item["timings"].append(timing_entry)
-            main.save_data(data)
+            save_data(data)
         else:
             df = data
             timings_col = df.at[data_idx,
@@ -32,11 +33,11 @@ def post_timing(data_idx: int, timing: dict):
             timings.append(timing_entry)
             df.at[data_idx, "timings"] = json.dumps(
                 timings, ensure_ascii=False)
-            main.save_data(df)
+            save_data(df)
         return {"message": "Timing gespeichert"}
     except FileNotFoundError:
         raise HTTPException(
-            status_code=404, detail=f"{main.DATA_FILE_PATH} not found")
+            status_code=404, detail=f"{DATA_FILE_PATH} not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -45,12 +46,12 @@ def post_timing(data_idx: int, timing: dict):
 def get_avg_annotation_time():
     """Calculate and return the average annotation time across all examples with timing data."""
     try:
-        data = main.load_data()
+        data = load_data()
         total_duration = 0.0
         total_entries = 0
 
         for idx, item in enumerate(data):
-            if main.DATA_FILE_TYPE == "json":
+            if DATA_FILE_TYPE == "json":
                 timings = item.get("timings", []) if isinstance(
                     item.get("timings"), list) else []
             else:
