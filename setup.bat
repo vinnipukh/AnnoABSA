@@ -45,7 +45,7 @@ if %errorlevel% neq 0 (
     echo [WARN] setuptools pin failed, continuing anyway...
 )
 
-REM Install Python deps
+REM Install Python deps (includes scikit-learn, rank-bm25, transformers, etc.)
 echo [3/5] Installing Python dependencies...
 pip install -e .
 if %errorlevel% neq 0 (
@@ -73,17 +73,43 @@ echo   How to run
 echo ============================================
 echo.
 echo   .venv\Scripts\activate
-echo   python cli.py examples/semeval_reviews.csv
+echo   python cli.py examples\semeval_reviews.csv
 echo.
 echo   With LLM predictions:
-echo   python cli.py --data-path examples/semeval_reviews.csv --llm-provider ollama
+echo   python cli.py --data-path examples\semeval_reviews.csv --llm-provider ollama
 echo.
 echo   With comparison models:
-echo   python cli.py --data-path examples/semeval_reviews.csv ^
-echo       --compare-model-a-csv results/model_a.csv --compare-model-a-name "GPT-4o" ^
-echo       --compare-model-b-csv results/model_b.csv --compare-model-b-name "Claude 4"
+echo   python cli.py --data-path examples\semeval_reviews.csv ^
+echo       --compare-model-a-csv results\model_a.csv --compare-model-a-name "GPT-4o" ^
+echo       --compare-model-b-csv results\model_b.csv --compare-model-b-name "Claude 4"
 echo.
-echo   NLP models (BERT, e5-small) download on first use to ^~/.cache/huggingface/
-echo   First requests to /nlp/sentiment and /nlp/embedding-similarity may be slow.
+echo   With Live Compare per-model config:
+echo   python cli.py --data-path examples\reviews.csv ^
+echo       --model-a-provider openai --model-a-model gpt-4o --model-a-temperature 0.3 ^
+echo       --model-b-provider anthropic --model-b-model claude-sonnet-4-20250514
+echo.
+echo   With Custom OpenAI-compatible provider:
+echo   python cli.py --data-path examples\reviews.csv ^
+echo       --llm-provider custom_openai --llm-model my-model ^
+echo       --custom-openai-url http://localhost:8001/v1 --custom-openai-key my-key
+echo.
+echo ============================================
+echo   Running tests
+echo ============================================
+echo.
+echo   REM Backend tests (128 pytest)
+echo   pytest tests/ -q
+echo.
+echo   REM Frontend tests (64 vitest)
+echo   cd frontend ^&^& npx vitest run
+echo.
+echo ============================================
+echo   First-time setup notes
+echo ============================================
+echo.
+echo   - NLP models (BERT, e5-small) download on first use to %%USERPROFILE%%\.cache\huggingface\
+echo   - First requests to /nlp/sentiment and /nlp/embedding-similarity may be slow.
+echo   - The Welcome Overlay on first load shows quick start options.
+echo   - Active Learning suggestions appear after annotating at least 2 reviews.
 echo.
 pause

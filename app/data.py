@@ -4,30 +4,29 @@ import json
 import ast
 import pandas as pd
 from fastapi import HTTPException
-from app.config import DATA_FILE_PATH, DATA_FILE_TYPE
+import app.config as cfg
 
 
 def load_data():
     """Load data from CSV or JSON file with UTF-8 encoding."""
-    if DATA_FILE_TYPE == "json":
-        with open(DATA_FILE_PATH, 'r', encoding='utf-8') as f:
+    if cfg.DATA_FILE_TYPE == "json":
+        with open(cfg.DATA_FILE_PATH, 'r', encoding='utf-8') as f:
             return json.load(f)
     else:
-        return pd.read_csv(DATA_FILE_PATH, encoding='utf-8')
+        return pd.read_csv(cfg.DATA_FILE_PATH, encoding='utf-8')
 
 
 def save_data(data):
     """Save data to CSV or JSON file with UTF-8 encoding."""
-    if DATA_FILE_TYPE == "json":
-        with open(DATA_FILE_PATH, 'w', encoding='utf-8') as f:
+    if cfg.DATA_FILE_TYPE == "json":
+        with open(cfg.DATA_FILE_PATH, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
     else:
         if isinstance(data, list):
-            # Convert list of dicts to DataFrame
             df = pd.DataFrame(data)
         else:
             df = data
-        df.to_csv(DATA_FILE_PATH, index=False, encoding='utf-8')
+        df.to_csv(cfg.DATA_FILE_PATH, index=False, encoding='utf-8')
 
 
 def parse_triplet_column(raw_val, prefix="t"):
@@ -124,6 +123,92 @@ def _load_comparison_csv(csv_path: str, data_idx: int, review_text: str, prefix:
         return results
 
 
+# ---------------------------------------------------------------------------
+# NEWUI 4-way comparison constants and parsers (Phase 7.1)
+# ---------------------------------------------------------------------------
+NEWUI_COLUMNS = {
+    "gt": {"label_col": "original_label", "prefix": "gt"},
+    "gm": {"label_col": "gemma4_31b_label", "prefix": "gm"},
+    "qw": {"label_col": "qwen3.6_35b_label", "prefix": "qw"},
+    "gpt": {"label_col": "gpt_oss_120b_label", "prefix": "gpt"},
+}
+
+
+def _detect_newui_columns(df: pd.DataFrame) -> bool:
+    """Check if the DataFrame has NEWUI 4-way comparison columns.
+
+    Returns True if all four model label columns exist in the DataFrame.
+    """
+    required_cols = {v["label_col"] for v in NEWUI_COLUMNS.values()}
+    return required_cols.issubset(set(df.columns))
+
+
+def _load_4way_row(row: pd.Series, row_dict: dict) -> dict | None:
+    """Parse a single CSV row with NEWUI 4-way comparison columns.
+
+    Detects columns: original_label, gemma4_31b_label, qwen3.6_35b_label,
+    gpt_oss_120b_label and parses each through ``parse_triplet_column()``.
+
+    Also extracts metadata fields: majority_vote (int),
+    majority_label (list), consensus_intersection (list),
+    original_llm_diff (string).
+
+    Returns None if the row does not have the required NEWUI columns
+    (safe to call on any CSV row — it will short-circuit fast).
+
+    Returns:
+        dict with keys: gt_triplets, gemma_triplets, qwen_triplets,
+        gpt_triplets, majority_vote, majority_label,
+        consensus_intersection, original_llm_diff
+        or None if NEWUI columns are absent.
+    """
+    # Quick check: do the label columns exist in this row?
+    label_cols = {v["label_col"] for v in NEWUI_COLUMNS.values()}
+    if not label_cols.issubset(set(row_dict.keys())):
+        return None
+
+    result = {}
+
+    # Parse each model's triplets through the existing parser
+    result["gt_triplets"] = parse_triplet_column(
+        row_dict.get("original_label"), prefix="gt")
+    result["gemma_triplets"] = parse_triplet_column(
+        row_dict.get("gemma4_31b_label"), prefix="gm")
+    result["qwen_triplets"] = parse_triplet_column(
+        row_dict.get("qwen3.6_35b_label"), prefix="qw")
+    result["gpt_triplets"] = parse_triplet_column(
+        row_dict.get("gpt_oss_120b_label"), prefix="gpt")
+
+    # Parse metadata fields
+    raw_mv = row_dict.get("majority_vote", "")
+    if raw_mv not in (None, "", "nan", "None"):
+        try:
+            result["majority_vote"] = int(raw_mv)
+        except (ValueError, TypeError):
+            result["majority_vote"] = 0
+    else:
+        result["majority_vote"] = 0
+
+    def _parse_list_field(raw):
+        if raw is None or str(raw).strip() in ("", "nan", "None"):
+            return []
+        try:
+            return ast.literal_eval(str(raw))
+        except Exception:
+            return []
+
+    result["majority_label"] = _parse_list_field(
+        row_dict.get("majority_label"))
+    result["consensus_intersection"] = _parse_list_field(
+        row_dict.get("consensus_intersection"))
+
+    raw_diff = row_dict.get("original_llm_diff", "")
+    result["original_llm_diff"] = "" if str(raw_diff) in (
+        "nan", "None", "") else str(raw_diff)
+
+    return result
+
+
 def get_total_count():
     """Return the total number of data items (reviews) in the current dataset.
 
@@ -137,7 +222,7 @@ def get_total_count():
         return len(data)
     except FileNotFoundError:
         raise HTTPException(
-            status_code=404, detail=f"{DATA_FILE_PATH} not found")
+            status_code=404, detail=f"{cfg.DATA_FILE_PATH} not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -158,7 +243,7 @@ def get_current_index():
     """
     try:
         data = load_data()
-        if DATA_FILE_TYPE == "json":
+        if cfg.DATA_FILE_TYPE == "json":
             # Find first entry that doesn't have a "label" key (not annotated yet)
             for idx, item in enumerate(data):
                 if 'label' not in item:
@@ -190,6 +275,6 @@ def max_number_of_idxs():
         return len(data)
     except FileNotFoundError:
         raise HTTPException(
-            status_code=404, detail=f"{DATA_FILE_PATH} not found")
+            status_code=404, detail=f"{cfg.DATA_FILE_PATH} not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

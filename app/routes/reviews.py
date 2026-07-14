@@ -1,7 +1,7 @@
 """Review data endpoints — GET /data/{idx}, POST /review/{idx}/save, POST /agent/chat."""
 from fastapi import APIRouter, HTTPException
 from app.config import CONFIG_DATA, DATA_FILE_PATH, DATA_FILE_TYPE
-from app.data import load_data, save_data, parse_triplet_column, _load_comparison_csv
+from app.data import load_data, save_data, parse_triplet_column, _load_comparison_csv, _load_4way_row
 from models.schemas import SaveTripletsRequest, AgentChatRequest
 from services import llm_providers
 import json
@@ -33,6 +33,7 @@ def get_data(data_idx: int):
         translation_val = ""
         label_val = ""
         aspects_val = default_aspects
+        newui_data = None
 
         if DATA_FILE_TYPE == "json":
             item = data[data_idx]
@@ -69,12 +70,15 @@ def get_data(data_idx: int):
                 if comp_b_path:
                     model_b_triplets = _load_comparison_csv(comp_b_path, data_idx, text_val, "mb")
 
+            # NEWUI 4-way comparison detection (Phase 7.1)
+            newui_data = _load_4way_row(row, row_dict)
+
         agent_initial_reasoning = str(row_dict.get("reasoning", "")) if DATA_FILE_TYPE != "json" and "reasoning" in row_dict else ""
         if not agent_initial_reasoning or agent_initial_reasoning in ["nan", "None", ""]:
             agent_initial_reasoning = generate_mock_reasoning(text_val, model_a_name, model_b_name,
                                                               model_a_triplets, model_b_triplets)
 
-        return {
+        response = {
             "id": data_idx,
             "text": text_val,
             "review_text": text_val,
@@ -87,6 +91,18 @@ def get_data(data_idx: int):
             "model_b_name": model_b_name,
             "agent_initial_reasoning": agent_initial_reasoning
         }
+
+        if newui_data is not None:
+            response["gt_triplets"] = newui_data["gt_triplets"]
+            response["gemma_triplets"] = newui_data["gemma_triplets"]
+            response["qwen_triplets"] = newui_data["qwen_triplets"]
+            response["gpt_triplets"] = newui_data["gpt_triplets"]
+            response["majority_vote"] = newui_data["majority_vote"]
+            response["majority_label"] = newui_data["majority_label"]
+            response["consensus_intersection"] = newui_data["consensus_intersection"]
+            response["original_llm_diff"] = newui_data["original_llm_diff"]
+
+        return response
 
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"{DATA_FILE_PATH} not found")

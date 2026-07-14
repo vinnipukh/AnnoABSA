@@ -84,13 +84,29 @@ main.py  (thin launcher — ~50 lines)
 ├── services/nlp_helpers.py
 │     4 lazy-loaded NLP tools (SentiNet, BERT, NlpToolkit, e5-small)
 │
+├── services/active_learning.py  (Phase 6)
+│     TF-IDF + LogisticRegression uncertainty sampling
+│     Functions: train_labeled_data(), get_uncertainty_scores(), labeled_texts_from_data()
+│
 ├── services/prediction.py
 │     Templates, prompt builders, BM25 retrieval, position helpers
 │
-└── services/llm_providers.py
-      Provider adapters: OllamaProvider, OpenAIProvider, AnthropicProvider, VLLMProvider
-      Dispatch: PROVIDER_REGISTRY, get_provider(), _derive_provider()
-      Validation: validate_provider_config(), validate_per_model_config()
+├── services/llm_providers.py
+│     Provider adapters: OllamaProvider, OpenAIProvider, AnthropicProvider, VLLMProvider, CustomOpenAIProvider
+│     Dispatch: PROVIDER_REGISTRY, get_provider(), _derive_provider()
+│     Validation: validate_provider_config(), validate_per_model_config()
+│
+├── app/routes/learning.py  (Phase 6)
+│     GET  /learning/suggestions — most uncertain reviews for annotation
+│     GET  /learning/predict/{data_idx} — ML-based triplet predictions
+│
+├── cli/  (Phase 6 breakup — extracted from cli.py)
+│     __init__.py — re-exports + main() function
+│     config.py — ABSAAnnotatorConfig class
+│     runner.py — start_backend(), start_frontend(), start_full_app()
+│     convert.py — std_triplets_to_label()
+│
+└── cli.py  (thin wrapper — 6 lines)
 ```
 
 ### Data flow for a single review, end to end

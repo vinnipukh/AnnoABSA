@@ -41,6 +41,15 @@ export interface ReviewComparisonData {
   model_a_name?: string;
   model_b_name?: string;
   agent_initial_reasoning: string;
+  // Phase 7: 4-way Compare Mode
+  gt_triplets?: TripletItem[];
+  gemma_triplets?: TripletItem[];
+  qwen_triplets?: TripletItem[];
+  gpt_triplets?: TripletItem[];
+  majority_vote?: number;
+  majority_label?: string;
+  consensus_intersection?: TripletItem[];
+  original_llm_diff?: TripletItem[];
 }
 
 export interface ChatMessage {
@@ -77,7 +86,7 @@ export interface Settings {
   compare_model_b_name: string | null;
   theme: string;
   // Phase 4: Live Compare Mode
-  compare_mode: 'csv' | 'live';
+  compare_mode: 'csv' | 'live' | '4way';
   model_a_provider: string | null;
   model_a_model: string | null;
   model_a_prompt: string | null;
@@ -113,9 +122,9 @@ export interface AppActions {
   prevReview: () => void;
   switchMode: (mode: 'compare' | 'manual') => void;
   toggleChat: (show?: boolean) => void;
-  selectTriplet: (role: 'model_a' | 'model_b', id: string) => void;
-  selectAllTriplets: (role: 'model_a' | 'model_b') => void;
-  clearAllTriplets: (role: 'model_a' | 'model_b') => void;
+  selectTriplet: (role: 'model_a' | 'model_b' | 'gt' | 'gemma' | 'qwen' | 'gpt', id: string) => void;
+  selectAllTriplets: (role: 'model_a' | 'model_b' | 'gt' | 'gemma' | 'qwen' | 'gpt') => void;
+  clearAllTriplets: (role: 'model_a' | 'model_b' | 'gt' | 'gemma' | 'qwen' | 'gpt') => void;
   addManualTriplet: (triplet: TripletItem) => void;
   removeManualTriplet: (id: string) => void;
   saveAndNext: () => Promise<void>;

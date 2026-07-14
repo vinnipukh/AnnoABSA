@@ -7,16 +7,25 @@
 
 ### NEWUI — Compare Mode UI Rework
 
-- [ ] **NEWUI-01**: Redesign Compare mode as a 2x2 grid (Ground Truth + 3 LLM columns) with a resolution panel. Screen split: review header top, left-side 2x2 grid, right-side resolution panel.
-- [ ] **NEWUI-02**: Ingest `semeval_tr_llm_annotated.csv` with columns: `text`, `original_label`, `gemma4_31b_label`, `qwen3.6_35b_label`, `gpt_oss_120b_label`, `majority_vote`, `majority_label`, `consensus_intersection`, `original_llm_diff`.
-- [ ] **NEWUI-03**: 2x2 Grid cards: Top-Left (Ground Truth / `original_label`), Top-Right (Gemma 31B), Bottom-Left (Qwen 35B), Bottom-Right (GPT-OSS 120B). Render unedited triplets from data source.
-- [ ] **NEWUI-04**: Consensus badge at center intersection of 2x2 grid. Display `majority_vote` integer. Color-code: Green=3, Yellow=2, Red=1.
-- [ ] **NEWUI-05**: Resolution panel with arrow pointing from 2x2 grid. Primary Suggestion Box shows `majority_label` (vote>1) or `consensus_intersection` (vote=1). Diff Tracker Box shows `original_llm_diff` with monospaced/diff-style rendering.
-- [ ] **NEWUI-06**: Tier 1 — Auto-Accept: `majority_vote >= 2 AND majority_label == original_label` → green badge, pre-select triplets.
-- [ ] **NEWUI-07**: Tier 2 — Quick Diff Verification: `majority_vote >= 2 AND majority_label != original_label` → yellow badge, highlight Diff Tracker Box.
-- [ ] **NEWUI-08**: Tier 3 — High-Confusion Review: `majority_vote == 1` → red badge, hide `majority_label`, prompt manual review of 2x2 grid.
-- [ ] **NEWUI-09**: Action buttons in resolution panel: accept, edit, manual entry controls.
-- [ ] **NEWUI-10**: Responsive layout — no overlap with NLP Helper Toolbar or Helper Agent Chatbox. Drag-to-select text span remains intact in review header.
+- [x] **NEWUI-01**: Redesign Compare mode as a 2x2 grid (Ground Truth + 3 LLM columns) with a resolution panel. Screen split: review header top, left-side 2x2 grid, right-side resolution panel.
+- [x] **NEWUI-02**: Ingest `semeval_tr_llm_annotated.csv` with columns: `text`, `original_label`, `gemma4_31b_label`, `qwen3.6_35b_label`, `gpt_oss_120b_label`, `majority_vote`, `majority_label`, `consensus_intersection`, `original_llm_diff`.
+- [x] **NEWUI-03**: 2x2 Grid cards: Top-Left (Ground Truth / `original_label`), Top-Right (Gemma 31B), Bottom-Left (Qwen 35B), Bottom-Right (GPT-OSS 120B). Render unedited triplets from data source.
+- [x] **NEWUI-04**: Consensus badge at center intersection of 2x2 grid. Display `majority_vote` integer. Color-code: Green=3, Yellow=2, Red=1.
+- [x] **NEWUI-05**: Resolution panel with arrow pointing from 2x2 grid. Primary Suggestion Box shows `majority_label` (vote>1) or `consensus_intersection` (vote=1). Diff Tracker Box shows `original_llm_diff` with monospaced/diff-style rendering.
+- [x] **NEWUI-06**: Tier 1 — Auto-Accept: `majority_vote >= 2 AND majority_label == original_label` → green badge, pre-select triplets.
+- [x] **NEWUI-07**: Tier 2 — Quick Diff Verification: `majority_vote >= 2 AND majority_label != original_label` → yellow badge, highlight Diff Tracker Box.
+- [x] **NEWUI-08**: Tier 3 — High-Confusion Review: `majority_vote == 1` → red badge, hide `majority_label`, prompt manual review of 2x2 grid.
+- [x] **NEWUI-09**: Action buttons in resolution panel: accept, edit, manual entry controls.
+- [x] **NEWUI-10**: Responsive layout — no overlap with NLP Helper Toolbar or Helper Agent Chatbox. Drag-to-select text span remains intact in review header.
+
+### NEWUI-POLISH — 4-Way Polish (Phase 7.4)
+
+- [ ] **NEWUI-11**: Display CSV column names (e.g. `gemma4_31b_label`) on 2x2 grid card headers alongside short names.
+- [ ] **NEWUI-12**: Demo mode that auto-loads pre-built sample data showing all 3 tier scenarios.
+- [ ] **NEWUI-13**: Tier filter dropdown (All / Tier 1 / Tier 2 / Tier 3) filters review queue by tier.
+- [ ] **NEWUI-14**: Auto-save on review navigation (next/previous) with toast confirmation.
+- [ ] **NEWUI-15**: Visible save button in resolution panel (`💾 Kaydet ve İlerle`).
+- [ ] **NEWUI-16**: CSV export endpoint `GET /data/export-4way` and frontend download button.
 
 ### TEST — Testing Coverage
 
@@ -66,16 +75,17 @@ Deferred to future phases. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |---|---|---|
-| NEWUI-01 through NEWUI-10 | Phase 7.1 | Pending |
+| NEWUI-01 through NEWUI-10 | Phase 7.1 | ✅ Complete |
+| NEWUI-11 through NEWUI-16 | Phase 7.4 | Pending |
 | TEST-01 through TEST-04 | Phase 7.2 | Pending |
 | TSFIX-01 through TSFIX-03 | Phase 7.2 | Pending |
 | AUTOPILOT-01 through AUTOPILOT-07 | Phase 7.3 | Pending |
 
 **Coverage:**
-- v1 requirements: 10 (NEWUI) + 4 (TEST) + 3 (TSFIX) + 7 (AUTOPILOT) = 24 total
-- Mapped to phases: 24
+- v1 requirements: 10 (NEWUI) + 6 (NEWUI-POLISH) + 4 (TEST) + 3 (TSFIX) + 7 (AUTOPILOT) = 30 total
+- Mapped to phases: 30
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-07-13*
-*Last updated: 2026-07-13 after Phase 7 initialization*
+*Last updated: 2026-07-13 after Phase 7.1 completion and Phase 7.4 definition*

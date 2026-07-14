@@ -63,6 +63,24 @@
 
 ---
 
+## Phase 7.4 — 4-Way Polish: Demo, Filters, Auto-Save & Export
+
+**Goal:** Polish the 4-Way compare mode with a demo data viewer, categorical tier filtering, auto-save on navigation, and CSV export for annotated outputs.
+
+**Requirements:** NEWUI-11 through NEWUI-16
+
+**Plans:**
+| Plan | Description | Est. effort |
+|------|-------------|-------------|
+| 1 | Frontend: Column header names + Demo data mode toggle with pre-built sample cases | Medium |
+| 2 | Frontend: Tier filter dropdown (All / Tier 1 / Tier 2 / Tier 3) on review navigation | Medium |
+| 3 | Frontend+Backend: Auto-save on review navigation + visible save button in resolution panel | Medium |
+| 4 | Backend: 4-way output export endpoint + frontend export button | Medium |
+
+**Wave execution:** Sequential (filter depends on tier data available, export depends on save flow)
+
+---
+
 ## Milestone Completion Criteria
 
 - [ ] NEWUI: 4-way Compare mode renders correctly with all 3 curation tiers functional

@@ -33,14 +33,18 @@ A researcher can efficiently annotate Turkish reviews for ABSA triplets (aspect 
 - ✓ **Custom OpenAI provider** — Any OpenAI-compatible API via URL + API key, added to `PROVIDER_REGISTRY` — Phase 6
 - ✓ **Smoke tests** — 4+ compile-only checks in `tests/test_smoke.py` — Phase 5
 - ✓ **Live Compare tests** — 19 integration tests in `tests/test_live_prediction.py` with FastAPI TestClient — Phase 4
+- ✓ **4-Way Compare Mode (NEWUI)** — 2x2 grid (GT + Gemma + Qwen + GPT), compact triplet chips, consensus diamond, 3-tier resolution panel — Phase 7.1
+- ✓ **NEWUI CSV parser** — `_load_4way_row()` for `semeval_tr_llm_annotated.csv` with `majority_vote`, `majority_label`, `consensus_intersection`, `original_llm_diff` — Phase 7.1
+- ✓ **Resolution panel tests** — 13 vitest tests for 3-tier curation logic — Phase 7.1
 
 ### Active
 
-- [ ] **NEWUI-01**: 4-way Compare Mode (2x2 grid: Ground Truth + 3 LLM columns + consensus resolution panel) — Phase 7
-- [ ] **NEWUI-02**: Data model for `semeval_tr_llm_annotated.csv` with `majority_vote`, `majority_label`, `consensus_intersection`, `original_llm_diff` — Phase 7
-- [ ] **NEWUI-03**: 3-tier curation workflow (Auto-Accept ⬢, Quick Diff Verification ⬡, High-Confusion Review ⬢) — Phase 7
-- [ ] **NEWUI-04**: Consensus badge at center intersection of 2x2 grid — Phase 7
-- [ ] **NEWUI-05**: Resolution panel with Primary Suggestion Box and Diff Tracker Box — Phase 7
+- [ ] **NEWUI-11**: Display CSV column names on 2x2 grid card headers — Phase 7.4
+- [ ] **NEWUI-12**: Demo mode with pre-built sample data showing all 3 tier scenarios — Phase 7.4
+- [ ] **NEWUI-13**: Tier filter dropdown (All / Tier 1 / 2 / 3) — Phase 7.4
+- [ ] **NEWUI-14**: Auto-save on review navigation — Phase 7.4
+- [ ] **NEWUI-15**: Save button in resolution panel — Phase 7.4
+- [ ] **NEWUI-16**: CSV export endpoint for 4-way results — Phase 7.4
 - [ ] **TEST-01**: Tests for `services/active_learning.py` (train, predict, uncertainty scoring) — Phase 7
 - [ ] **TEST-02**: Tests for `app/routes/learning.py` endpoint — Phase 7
 - [ ] **TEST-03**: Tests for `cli/` package (config, convert, runner smoke tests) — Phase 7
@@ -66,9 +70,9 @@ A researcher can efficiently annotate Turkish reviews for ABSA triplets (aspect 
 - **Stack:** Python 3.11, FastAPI, uvicorn / React 19, TypeScript 5.9, Vite 4, Tailwind CSS 3, DaisyUI 4
 - **ML/NLP:** scikit-learn, transformers, torch, sentence-transformers, rank-bm25, nlptoolkit-* (SentiNet, WordNet, Dictionary, MorphologicalAnalysis)
 - **LLM Providers:** Ollama (localhost:11434), OpenAI, Anthropic, vLLM, Custom OpenAI (any OpenAI-compatible API)
-- **Testing:** 133 pytest (backend) + 51 vitest (frontend) = 184 automated tests; ~60 manual browser cases
+- **Testing:** 128 pytest (backend) + 64 vitest (frontend) = 192 automated tests; ~60 manual browser cases
 - **Data:** CSV or JSON files, auto-detected from extension, loaded/saved via `load_data()`/`save_data()` in `app/data.py`
-- **Dev history:** 6 completed phases from foundation through polish, autopilot, active learning
+- **Dev history:** 7 completed phases (Phase 7.1: 4-Way Compare Mode with 3-tier curation)
 - **Known issues:**
   - `data.py` import staleness: `from app.config import X` creates by-value copies; prefer `import app.config as cfg`
   - CORS allows all origins (`*`) — no authentication
@@ -120,4 +124,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-13 after Phase 7 initialization*
+*Last updated: 2026-07-13 after Phase 7.1 completion*
