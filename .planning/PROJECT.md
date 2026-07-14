@@ -33,7 +33,8 @@ A researcher can efficiently annotate Turkish reviews for ABSA triplets (aspect 
 - ✓ **Custom OpenAI provider** — Any OpenAI-compatible API via URL + API key, added to `PROVIDER_REGISTRY` — Phase 6
 - ✓ **Smoke tests** — 4+ compile-only checks in `tests/test_smoke.py` — Phase 5
 - ✓ **Live Compare tests** — 19 integration tests in `tests/test_live_prediction.py` with FastAPI TestClient — Phase 4
-- ✓ **4-Way Compare Mode (NEWUI)** — 2x2 grid (GT + Gemma + Qwen + GPT), compact triplet chips, consensus diamond, 3-tier resolution panel — Phase 7.1
+- ✓ **ML per-review prediction** — "Tahmin Et" button: TF-IDF + LogisticRegression trained on user-annotated reviews, predicts triplets for current review, auto-selects matches in 4-way grid — Phase 7.5
+- ✓ **Default 4-Way mode** — App opens in 4-Way Comparison by default. Tier 2/3 filter for uncertain reviews — Phase 7.4/7.5
 - ✓ **NEWUI CSV parser** — `_load_4way_row()` for `semeval_tr_llm_annotated.csv` with `majority_vote`, `majority_label`, `consensus_intersection`, `original_llm_diff` — Phase 7.1
 - ✓ **Resolution panel tests** — 13 vitest tests for 3-tier curation logic — Phase 7.1
 - ✓ **Active learning tests** — 18 pytest tests for `services/active_learning.py` (train, predict, uncertainty scoring) — Phase 7.2
@@ -59,7 +60,7 @@ A researcher can efficiently annotate Turkish reviews for ABSA triplets (aspect 
 
 ### Active
 
-*(None — Phase 7 fully complete!)*
+*(None — Phase 7.5 complete: 224 backend + 94 frontend tests, 0 TS errors, 4-Way default mode)*
 
 ### Out of Scope
 
@@ -73,9 +74,9 @@ A researcher can efficiently annotate Turkish reviews for ABSA triplets (aspect 
 - **Stack:** Python 3.11, FastAPI, uvicorn / React 19, TypeScript 5.9, Vite 5, Tailwind CSS 3, DaisyUI 4
 - **ML/NLP:** scikit-learn, transformers, torch, sentence-transformers, rank-bm25, nlptoolkit-* (SentiNet, WordNet, Dictionary, MorphologicalAnalysis)
 - **LLM Providers:** Ollama (localhost:11434), OpenAI, Anthropic, vLLM, Custom OpenAI (any OpenAI-compatible API)
-- **Testing:** 237 pytest (backend) + 88 vitest (frontend) = 325 automated tests
+- **Testing:** 224 pytest (backend) + 94 vitest (frontend) = 318 automated tests
 - **Data:** CSV or JSON files, auto-detected from extension, loaded/saved via `load_data()`/`save_data()` in `app/data.py`
-- **Dev history:** 7 completed phases (Phases 1-6) + 4 Phase 7 sub-phases fully complete. Backend: 237 tests. Frontend: 88 tests. 0 TS errors.
+- **Dev history:** 7 phases + 4 Phase 7 sub-phases completed. Backend: 224 tests. Frontend: 94 tests. 0 TS errors. Default: 4-Way Comparison.
 - **Route modules:** 9 (`nlp`, `settings`, `reviews`, `ai`, `timing`, `upload`, `learning`, `chat_predictions`, `export`)
 - **Frontend components:** 21 React components + 7 custom hooks + demo data module
 - **Known issues:**
@@ -131,4 +132,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-14 — Phase 7 fully complete (all 4 sub-phases, 237+88 tests)*
+*Last updated: 2026-07-14 — Phase 7.5 complete (4-Way default, ML per-review prediction, 224+94 tests)*
