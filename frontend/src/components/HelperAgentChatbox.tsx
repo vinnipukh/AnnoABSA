@@ -1,11 +1,34 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ChatMessage } from '../types';
+import { ChatMessage, AppActions } from '../types';
+
+function parseAutopilotActions(text: string): Array<{method: string; args: string[]}> {
+  const pattern = /\[\[action:(\w+)\(([^)]*)\)\]\]/g;
+  const actions: Array<{method: string; args: string[]}> = [];
+  let match;
+  while ((match = pattern.exec(text)) !== null) {
+    const args = match[2]
+      ? match[2].split(',').map(a => a.trim().replace(/^["']|["']$/g, ''))
+      : [];
+    actions.push({method: match[1], args});
+  }
+  return actions;
+}
+
+function stripAutopilotMarkers(text: string): string {
+  return text.replace(/\[\[action:\w+\([^)]*\)\]\]/g, '').trim();
+}
 
 interface HelperAgentChatboxProps {
   initialReasoning: string;
   messages: ChatMessage[];
   onSendMessage: (text: string) => void;
   isLoading?: boolean;
+  /**
+   * App actions — enables autopilot mode where the Helper Agent can
+   * programmatically drive the app (navigate, switch modes, save, etc.).
+   * When provided, the agent's structured responses can trigger these actions.
+   */
+  appActions?: AppActions;
 }
 
 const MIN_W = 280;
@@ -20,7 +43,12 @@ export const HelperAgentChatbox: React.FC<HelperAgentChatboxProps> = ({
   messages,
   onSendMessage,
   isLoading = false,
+  appActions,
 }) => {
+  // Store appActions in a ref so the agent's response parser can access them
+  // without causing re-renders when they change.
+  const appActionsRef = useRef<AppActions | undefined>(appActions);
+  useEffect(() => { appActionsRef.current = appActions; }, [appActions]);
   const [minimized, setMinimized] = useState(false);
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -41,6 +69,20 @@ export const HelperAgentChatbox: React.FC<HelperAgentChatboxProps> = ({
   useEffect(() => {
     if (!minimized) scrollToBottom();
   }, [messages, initialReasoning, minimized, scrollToBottom]);
+
+  // Autopilot: execute action directives from agent replies
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg.sender !== 'agent') return;
+    const actions = parseAutopilotActions(lastMsg.text);
+    for (const action of actions) {
+      const fn = (appActionsRef.current as any)?.[action.method];
+      if (typeof fn === 'function') {
+        fn(...action.args);
+      }
+    }
+  }, [messages]);
 
   const startResize = useCallback((corner: Corner) => (e: React.MouseEvent) => {
     e.preventDefault();
@@ -209,7 +251,7 @@ export const HelperAgentChatbox: React.FC<HelperAgentChatboxProps> = ({
             }`}>{m.sender === 'agent' ? '🤖' : 'S'}</div>
             <div className={`max-w-[80%] rounded-xl px-3 py-2 text-xs ${
               m.sender === 'agent' ? 'bg-base-200/90 text-base-content border border-base-300/80' : 'bg-primary text-primary-content'
-            }`}><div className="whitespace-pre-line leading-relaxed">{m.text}</div></div>
+            }`}><div className="whitespace-pre-line leading-relaxed">{stripAutopilotMarkers(m.text)}</div></div>
           </div>
         ))}
         {isLoading && (

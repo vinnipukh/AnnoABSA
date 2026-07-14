@@ -57,7 +57,7 @@ function ResultDisplay({ data }: { data: any }) {
       : pol === 'negative' ? 'text-error' : 'text-warning';
     return (
       <span className={color + ' font-bold'}>
-        {pol === 'positive' ? '😊 Olumlu' : pol === 'negative' ? '😞 Olumsuz' : '😐 Nötr'}
+        {pol === 'positive' ? <><svg className="w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></svg> Olumlu</> : pol === 'negative' ? <><svg className="w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M16 16s-1.5-2-4-2-4 2-4 2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></svg> Olumsuz</> : <><svg className="w-4 h-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="8" y1="14" x2="16" y2="14" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></svg> Nötr</>}
         {' · '}
         {data.words?.filter((w: any) => w.polarity !== 'unknown').length || 0} kelime
       </span>
@@ -88,7 +88,7 @@ function ResultDisplay({ data }: { data: any }) {
 /* ── Segment button ─────────────────────────────────────────────────── */
 
 interface SegmentButtonProps {
-  emoji: string;
+  emoji: React.ReactNode;
   label: string;
   loading: boolean;
   data: any;
@@ -232,21 +232,21 @@ export const NlpHelperToolbar: React.FC<NlpHelperToolbarProps> = ({
       ) : (
         <div className="p-2 space-y-1">
           {/* Lexicon — auto-loaded */}
-          <SegmentButton emoji="📖" label="Sözlük (SentiNet)"
+          <SegmentButton emoji={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>} label="Sözlük (SentiNet)"
             loading={lexiconResult.loading} data={lexiconResult.data} error={lexiconResult.error}
             onClick={() => {}} />
           <div className="border-t border-base-300 my-1" />
           {/* Sentiment — on click */}
-          <SegmentButton emoji="🤖" label="Duygu Analizi (BERT)"
+          <SegmentButton emoji={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2" /><circle cx="12" cy="5" r="2" /><path d="M12 7v4" /><line x1="8" y1="16" x2="8" y2="16" /><line x1="16" y1="16" x2="16" y2="16" /></svg>} label="Duygu Analizi (BERT)"
             loading={sentimentResult.loading} data={sentimentResult.data} error={sentimentResult.error}
             onClick={() => fetchSegment('/nlp/sentiment', { text: selectedText }, setSentimentResult, abortRef)} />
           {/* Morphology — on click */}
-          <SegmentButton emoji="🔧" label="Yapı Çözümleme (NlpToolkit)"
+          <SegmentButton emoji={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg>} label="Yapı Çözümleme (NlpToolkit)"
             loading={morphologyResult.loading} data={morphologyResult.data} error={morphologyResult.error}
             onClick={() => fetchSegment('/nlp/morphology',
               { word: selectedText.split(/\s+/)[0] }, setMorphologyResult, abortRef)} />
           {/* Similarity — on click */}
-          <SegmentButton emoji="📊" label="Benzerlik Karşılaştırması"
+          <SegmentButton emoji={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></svg>} label="Benzerlik Karşılaştırması"
             loading={similarityResult.loading} data={similarityResult.data} error={similarityResult.error}
             onClick={() => {
               if (!sentenceText) return;

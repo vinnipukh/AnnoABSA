@@ -41,6 +41,15 @@ export interface ReviewComparisonData {
   model_a_name?: string;
   model_b_name?: string;
   agent_initial_reasoning: string;
+  // Phase 7: 4-way Compare Mode
+  gt_triplets?: TripletItem[];
+  gemma_triplets?: TripletItem[];
+  qwen_triplets?: TripletItem[];
+  gpt_triplets?: TripletItem[];
+  majority_vote?: number;
+  majority_label?: string;
+  consensus_intersection?: TripletItem[];
+  original_llm_diff?: TripletItem[];
 }
 
 export interface ChatMessage {
@@ -76,4 +85,51 @@ export interface Settings {
   compare_model_a_name: string | null;
   compare_model_b_name: string | null;
   theme: string;
+  // Phase 4: Live Compare Mode
+  compare_mode: 'csv' | 'live' | '4way';
+  model_a_provider: string | null;
+  model_a_model: string | null;
+  model_a_prompt: string | null;
+  model_a_temperature: number;
+  model_b_provider: string | null;
+  model_b_model: string | null;
+  model_b_prompt: string | null;
+  model_b_temperature: number;
+  helper_agent_provider: string | null;
+  helper_agent_model: string | null;
+  helper_agent_prompt: string | null;
+  helper_agent_temperature: number;
+  ai_shortcut_key: string;
+  // Phase 6: Custom OpenAI-compatible API provider
+  custom_openai_url: string | null;
+  custom_openai_key: string | null;
+  custom_openai_model: string | null;
+}
+
+/**
+ * AppActions — programmatic action interface for the Helper Agent autopilot.
+ *
+ * Exposes every core UI action so an agent can drive the app (navigate,
+ * switch modes, select/deselect, save, trigger predictions).
+ * Passed to HelperAgentChatbox so the agent's structured responses can
+ * trigger these actions directly.
+ *
+ * Extend this interface when adding new interactive features.
+ */
+export interface AppActions {
+  navigateTo: (index: number) => void;
+  nextReview: () => void;
+  prevReview: () => void;
+  switchMode: (mode: 'compare' | 'manual') => void;
+  toggleChat: (show?: boolean) => void;
+  selectTriplet: (role: 'model_a' | 'model_b' | 'gt' | 'gemma' | 'qwen' | 'gpt', id: string) => void;
+  selectAllTriplets: (role: 'model_a' | 'model_b' | 'gt' | 'gemma' | 'qwen' | 'gpt') => void;
+  clearAllTriplets: (role: 'model_a' | 'model_b' | 'gt' | 'gemma' | 'qwen' | 'gpt') => void;
+  addManualTriplet: (triplet: TripletItem) => void;
+  removeManualTriplet: (id: string) => void;
+  saveAndNext: () => Promise<void>;
+  triggerAIPrediction: () => Promise<void>;
+  triggerLivePrediction: (role: 'model_a' | 'model_b') => Promise<void>;
+  clearAll: () => void;
+  openSettings: () => void;
 }

@@ -39,7 +39,29 @@ DEFAULT_CHAT_TEMPLATE = (
     'Şu incelemeyi tartışıyorsunuz: "{review_text}". '
     '{model_a_name} tripletleri: {model_a_triplets}, '
     '{model_b_name} tripletleri: {model_b_triplets}. '
-    "Kullanıcıya mantıklı, akıl yürüterek açıklama yap."
+    'Benzer etiketlenmiş örnekler:\\n{few_shot_examples}\\n'
+    "Kullanıcıya mantıklı, akıl yürüterek açıklama yap.\\n"
+    "\\n"
+    "Kullanıcıya yardımcı olmak için aşağıdaki eylemleri yapabilirsin.\\n"
+    "Eylemleri yanıtının içine [[action:methodAdı(args)]] şeklinde göm.\\n"
+    "Örnek: 'Sonraki incelemeye geçiyorum [[action:nextReview()]]'\\n"
+    "\\n"
+    "Kullanılabilir eylemler:\\n"
+    "- nextReview() — sonraki incelemeye geç\\n"
+    "- prevReview() — önceki incelemeye geç\\n"
+    "- navigateTo(index) — belirtilen indeksteki incelemeye git\\n"
+    "- switchMode(mode) — 'compare' veya 'manual' moduna geç\\n"
+    "- selectAllTriplets(role) — 'model_a' veya 'model_b' tüm tripletlerini seç\\n"
+    "- clearAllTriplets(role) — tüm seçimleri temizle\\n"
+    "- saveAndNext() — kaydet ve sonraki incelemeye geç\\n"
+    "- triggerAIPrediction() — AI tahmini başlat\\n"
+    "- triggerLivePrediction(role) — canlı tahmin başlat\\n"
+    "- openSettings() — ayarları aç\\n"
+    "- toggleChat() — sohbeti aç/kapa\\n"
+    "- clearAll() — tüm seçimleri ve manuel tripletleri temizle\\n"
+    "\\n"
+    "Sadece gerçekten yapmak istediğin eylemleri kullan. "
+    "Her mesajda en fazla 1-2 eylem kullan, kullanıcıyı bunaltma."
 )
 
 

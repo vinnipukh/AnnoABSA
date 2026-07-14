@@ -132,23 +132,40 @@ Covers automated (pytest + vitest) and manual (browser) test cases.
 |---|---|---|---|
 | VT1 | 14 toolbar component tests | All pass: collapse/expand, auto-fetch, on-demand, errors, Escape, abort | ✓ (27 total) |
 
+### Tier 9 — Live Compare Mode
+
+| ID | Test | Expected | Verdict |
+|---|---|---|---|
+| LC1 | Open Settings → switch Compare Mode to ⚡ Canlı | Mode toggle shows "Canlı", CSV columns go empty | — |
+| LC2 | Click "Model A Çalıştır" with unconfigured provider | Error toast: "model_a: No provider configured" | — |
+| LC3 | Configure Model A (provider=ollama, model=gemma3:4b), click "Model A Çalıştır" | Loading spinner → triplet list appears in column | — |
+| LC4 | Click "Model B Çalıştır" with unconfigured model_b | Error toast: "model_b: No model configured" | — |
+| LC5 | Configure Model B, click "Model B Çalıştır" | Triplets appear, independent of Model A's output | — |
+| LC6 | Select some triplets, save & advance | POST /review/{idx}/save called, row advances | — |
+| LC7 | Navigate back to the saved row | Live state cleared, columns empty again | — |
+| LC8 | Switch Compare Mode back to 📁 CSV | CSV data re-appears in columns (no regression) | — |
+| LC9 | Configure custom Model A prompt → run | Different prompt produces different output | — |
+| LC10 | Set temperature to 1.5 → run | Output may differ from temperature=0.0 run | — |
+
 ---
 
 ## Automated Tests
 
 ```bash
-pytest tests/        # 93 backend tests
+pytest tests/        # 133 backend tests
 cd frontend && npx vitest run   # 27 frontend tests
 ```
 
-### Backend (pytest — 93 tests)
+### Backend (pytest — 133 tests)
 
 | File | Tests | What it covers | Correlates to |
 |---|---|---|---|
 | `tests/test_prediction.py` | 38 | `find_phrase_positions`, `find_valid_phrases_list`, `generate_mock_reasoning`, `build_prediction_prompt`, `build_absa_models`, `get_most_similar_examples` | MA3/MA4 position math, H1 fallback, prompt templates |
-| `tests/test_llm_providers.py` | 31 | `_derive_provider` (12 scenarios), `PROVIDER_REGISTRY`, `get_provider` factory, `predict_llm` importable, `validate_provider_config` (10 scenarios) | Provider derivation, key validation |
+| `tests/test_llm_providers.py` | 31 | `_derive_provider` (12 scenarios), `PROVIDER_REGISTRY`, `get_provider` factory, `predict_llm` importable, `validate_provider_config` (10 scenarios), `validate_per_model_config` | Provider derivation, key validation, per-model config |
 | `tests/test_main_helpers.py` | 12 | `parse_triplet_column` (STD tuples, lists, dicts, empty/null) | KA7 NULL handling, data loading |
 | `tests/test_nlp_helpers.py` | 12 | `lexicon_polarity`, `sentiment_classify`, `morphology`, `embedding_similarity` (all mocked) | NLB1–NLB8 handler logic |
+| `tests/test_live_prediction.py` | 31 | `get_live_prediction` happy path, error cases (no provider, no model, unknown role), temperature propagation, per-model config validation | LC1–LC10 live compare mode |
+| `tests/test_smoke.py` | ~9 | `GET /settings`, `GET /data/0`, import chain, 404, CORS (CSV + JSON) | S1/S5 smoke tests |
 
 ### Frontend (vitest — 27 tests)
 
@@ -386,8 +403,8 @@ Elements present:
 
 | Suite | Command | Count |
 |---|---|---|
-| Backend pure logic | `pytest tests/` | 93 |
+| Backend pure logic | `pytest tests/` | 133 |
 | Frontend pure functions | `npx vitest run` | 13 (hook) |
 | Frontend component tests | `npx vitest run` | 14 (toolbox) |
-| **Total automated** | | **120** |
-| Manual browser walkthrough | `tests/testcases.md` tiers 1–8 | ~50 cases |
+| **Total automated** | | **160** |
+| Manual browser walkthrough | `tests/testcases.md` tiers 1–9 | ~60 cases |

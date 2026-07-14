@@ -33,7 +33,7 @@ class LLMProviderPort(Protocol):
     def predict(self, text, considered_sentiment_elements, examples,
                 aspect_categories, polarities, allow_implicit_aspect_terms,
                 allow_implicit_opinion_terms, n_few_shot, llm_model,
-                prompt_template=None):
+                prompt_template=None, temperature=0.7):
         """Predict ABSA triplets from text.
 
         Returns (predictions_dict, few_shot_examples_list).
@@ -44,7 +44,8 @@ class LLMProviderPort(Protocol):
         """Send a chat message and return the response text."""
         ...
 
-def predict_llm(text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms=False, allow_implicit_opinion_terms=False, n_few_shot=10, llm_model="gemma3:4b", prompt_template=None):
+
+def predict_llm(text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms=False, allow_implicit_opinion_terms=False, n_few_shot=10, llm_model="gemma3:4b", prompt_template=None, temperature=0.7):
     """Predict sentiment elements using Ollama (backward-compatible wrapper).
 
     Stable compatibility shim for evaluation/eval.py — delegates to the provider adapter
@@ -61,8 +62,10 @@ def predict_llm(text, considered_sentiment_elements, examples, aspect_categories
         aspect_categories, polarities,
         allow_implicit_aspect_terms, allow_implicit_opinion_terms,
         n_few_shot, llm_model, prompt_template=prompt_template,
+        temperature=temperature,
     )
     return result, examples
+
 
 class OllamaProvider:
     """LLM provider adapter for Ollama (local inference).
@@ -76,7 +79,7 @@ class OllamaProvider:
         """Initialize with the application config dict (CONFIG_DATA)."""
         self.config = config
 
-    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None):
+    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None, temperature=0.7):
         """Predict ABSA triplets via Ollama's generate endpoint with structured JSON output.
 
         Uses Pydantic model_json_schema() for the format parameter,
@@ -101,7 +104,7 @@ class OllamaProvider:
             prompt=prompt,
             model=llm_model,
             raw=True,
-            options={"temperature": 0.0, "max_tokens": 1024},
+            options={"temperature": temperature, "max_tokens": 1024},
             format=Aspects.model_json_schema()
         )
         aspects = Aspects.model_validate_json(response.response)
@@ -148,7 +151,7 @@ class OpenAIProvider:
         """Initialize with the application config dict (CONFIG_DATA)."""
         self.config = config
 
-    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None):
+    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None, temperature=0.7):
         """Predict ABSA triplets via OpenAI structured output (beta.parse).
 
         Uses client.beta.chat.completions.parse with a Pydantic response_format
@@ -181,7 +184,7 @@ class OpenAIProvider:
                     {"role": "user", "content": prompt},
                 ],
                 response_format=Aspects,
-                temperature=0.0
+                temperature=temperature
             )
             message = completion.choices[0].message
             if message.parsed:
@@ -234,7 +237,7 @@ class AnthropicProvider:
 
     Uses the anthropic Python library with messages.create for both
     ABSA prediction (JSON extraction from response text) and general
-    chat (OpenAI→Anthropic message format conversion).
+    chat (OpenAI->Anthropic message format conversion).
 
     Requires 'anthropic_key' in the config dict.
     """
@@ -243,7 +246,7 @@ class AnthropicProvider:
         """Initialize with the application config dict (CONFIG_DATA)."""
         self.config = config
 
-    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None):
+    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None, temperature=0.7):
         """Predict ABSA triplets via Anthropic Claude.
 
         Sends the prompt as a user message, then parses JSON from the
@@ -274,7 +277,7 @@ class AnthropicProvider:
             response = client.messages.create(
                 model=llm_model or "claude-sonnet-4-20250514",
                 max_tokens=1024,
-                temperature=0.0,
+                temperature=temperature,
                 system="You are a helpful assistant for aspect-based sentiment analysis. Extract the sentiment elements from the given text according to the provided instructions. Return valid JSON matching the expected schema.",
                 messages=[
                     {"role": "user", "content": prompt}
@@ -345,7 +348,7 @@ class VLLMProvider:
         """Initialize with the application config dict (CONFIG_DATA)."""
         self.config = config
 
-    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None):
+    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None, temperature=0.7):
         """Predict ABSA triplets via vLLM (standard OpenAI completion + manual JSON parse).
 
         vLLM does not support the structured output API (beta.parse), so this
@@ -380,7 +383,7 @@ class VLLMProvider:
                     {"role": "system", "content": "You are a helpful assistant for aspect-based sentiment analysis. Extract the sentiment elements from the given text according to the provided instructions. Return valid JSON matching the expected schema."},
                     {"role": "user", "content": prompt},
                 ],
-                temperature=0.0,
+                temperature=temperature,
                 max_tokens=1024
             )
             content = completion.choices[0].message.content
@@ -424,13 +427,132 @@ class VLLMProvider:
         return completion.choices[0].message.content
 
 
-# Provider registry: maps provider name → adapter class
+class CustomOpenAIProvider:
+    """LLM provider adapter for any OpenAI-compatible API.
+
+    Uses the openai Python library with a custom base_url and API key,
+    allowing connection to any service that exposes an OpenAI-compatible
+    endpoint (e.g., DeepSeek, Together AI, Groq, Fireworks, etc.).
+
+    Tries structured output (beta.chat.completions.parse) first; falls back
+    to standard completion + manual JSON parse if the endpoint doesn't
+    support structured output.
+
+    Requires 'custom_openai_url' and 'custom_openai_key' in the config dict.
+    The model name comes from 'custom_openai_model'.
+    """
+
+    def __init__(self, config: dict):
+        """Initialize with the application config dict (CONFIG_DATA)."""
+        self.config = config
+
+    def predict(self, text, considered_sentiment_elements, examples, aspect_categories, polarities, allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot, llm_model, prompt_template=None, temperature=0.7):
+        """Predict ABSA triplets via an OpenAI-compatible API.
+
+        Tries structured output (beta.parse) first; falls back to standard
+        completion + manual JSON parse for endpoints that don't support it.
+        """
+        from openai import OpenAI
+        import json
+
+        base_url = self.config.get("custom_openai_url")
+        api_key = self.config.get("custom_openai_key")
+        if not base_url:
+            raise ValueError("Custom OpenAI URL is required")
+        if not api_key:
+            raise ValueError("Custom OpenAI API key is required")
+
+        client = OpenAI(api_key=api_key, base_url=base_url)
+
+        prompt, few_shot_examples = build_prediction_prompt(
+            text, considered_sentiment_elements, examples,
+            aspect_categories, polarities,
+            allow_implicit_aspect_terms, allow_implicit_opinion_terms, n_few_shot,
+            prompt_template=prompt_template
+        )
+        Aspects, _, _ = build_absa_models(
+            text, considered_sentiment_elements, polarities,
+            aspect_categories, allow_implicit_aspect_terms, allow_implicit_opinion_terms
+        )
+
+        # Try structured output first (beta.parse)
+        try:
+            completion = client.beta.chat.completions.parse(
+                model=llm_model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant for aspect-based sentiment analysis. Extract the sentiment elements from the given text according to the provided instructions."},
+                    {"role": "user", "content": prompt},
+                ],
+                response_format=Aspects,
+                temperature=temperature
+            )
+            message = completion.choices[0].message
+            if message.parsed:
+                aspects_data = {"aspects": []}
+                for aspect in message.parsed.aspects:
+                    aspect_dict = {}
+                    for element in considered_sentiment_elements:
+                        aspect_dict[element] = getattr(aspect, element).value
+                    aspects_data["aspects"].append(aspect_dict)
+                return aspects_data, few_shot_examples
+        except Exception:
+            # Fall back to standard completion + manual JSON parse
+            pass
+
+        # Fallback: standard completion + manual JSON parse
+        try:
+            completion = client.chat.completions.create(
+                model=llm_model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant for aspect-based sentiment analysis. Extract the sentiment elements from the given text according to the provided instructions. Return valid JSON matching the expected schema."},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=temperature,
+                max_tokens=1024
+            )
+            content = completion.choices[0].message.content
+            try:
+                parsed = json.loads(content)
+                aspects_list = parsed.get("aspects", [])
+                return {"aspects": aspects_list}, few_shot_examples
+            except json.JSONDecodeError:
+                print(f"Custom OpenAI returned non-JSON response: {content[:200]}")
+                return {"aspects": []}, few_shot_examples
+        except Exception as e:
+            print(f"Error in Custom OpenAI prediction: {e}")
+            return {"aspects": []}, few_shot_examples
+
+    def chat(self, messages, model, temperature=0.7, max_tokens=300):
+        """Send a chat message via an OpenAI-compatible API.
+
+        Uses the openai Python library with the custom base_url.
+        Used by the Helper Agent panel.
+        """
+        from openai import OpenAI
+        base_url = self.config.get("custom_openai_url")
+        api_key = self.config.get("custom_openai_key")
+        if not base_url:
+            raise ValueError("Custom OpenAI URL is required")
+        if not api_key:
+            raise ValueError("Custom OpenAI API key is required")
+        client = OpenAI(api_key=api_key, base_url=base_url)
+        completion = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+        return completion.choices[0].message.content
+
+
+# Provider registry: maps provider name to adapter class
 
 PROVIDER_REGISTRY = {
     "ollama": OllamaProvider,
     "openai": OpenAIProvider,
     "anthropic": AnthropicProvider,
     "vllm": VLLMProvider,
+    "custom_openai": CustomOpenAIProvider,
 }
 
 
@@ -438,10 +560,10 @@ def _derive_provider(config: dict) -> str:
     """Derive the LLM provider from a config dict.
 
     Priority:
-    1. Explicit 'llm_provider' key → use it directly.
-    2. Exactly one of (openai_key, anthropic_key, vllm_url) is set → derive to that provider.
-    3. Multiple of the above are set but no explicit 'llm_provider' → raise ValueError.
-    4. None are set → fall back to 'ollama'.
+    1. Explicit 'llm_provider' key -> use it directly.
+    2. Exactly one of (openai_key, anthropic_key, vllm_url, custom_openai_url) is set -> derive to that provider.
+    3. Multiple of the above are set but no explicit 'llm_provider' -> raise ValueError.
+    4. None are set -> fall back to 'ollama'.
 
     NOTE: The validation step (checking that the chosen provider has its required
     config keys) is handled by ``validate_provider_config()`` in this same module.
@@ -456,6 +578,7 @@ def _derive_provider(config: dict) -> str:
             ("openai", "openai_key"),
             ("anthropic", "anthropic_key"),
             ("vllm", "vllm_url"),
+            ("custom_openai", "custom_openai_url"),
         ] if config.get(key)
     ]
 
@@ -474,7 +597,7 @@ def get_provider(provider_name: str, config: dict):
     """Factory: instantiate the right provider adapter for the given name.
 
     Args:
-        provider_name: One of 'ollama', 'openai', 'anthropic', 'vllm'.
+        provider_name: One of 'ollama', 'openai', 'anthropic', 'vllm', 'custom_openai'.
         config: Configuration dict (CONFIG_DATA) containing provider-specific keys.
 
     Returns:
@@ -496,10 +619,11 @@ def validate_provider_config(provider_name: str, config: dict) -> list[str]:
     """Validate that the given LLM provider has its required config keys.
 
     Checks provider-specific requirements:
-    - openai → openai_key must be set
-    - anthropic → anthropic_key must be set
-    - vllm → vllm_url must be set
-    - ollama → no required keys (runs locally, no validation needed)
+    - openai -> openai_key must be set
+    - anthropic -> anthropic_key must be set
+    - vllm -> vllm_url must be set
+    - custom_openai -> custom_openai_url and custom_openai_key must be set
+    - ollama -> no required keys (runs locally, no validation needed)
 
     Returns a list of error messages (empty list = valid).
     Each caller handles dispatch differently:
@@ -519,6 +643,45 @@ def validate_provider_config(provider_name: str, config: dict) -> list[str]:
         errors.append(
             "vLLM provider selected but no URL configured. Use --vllm-url."
         )
+    if provider_name == 'custom_openai':
+        if not config.get('custom_openai_url'):
+            errors.append(
+                "Custom OpenAI provider selected but no URL configured. Set it in Settings or use --custom-openai-url."
+            )
+        if not config.get('custom_openai_key'):
+            errors.append(
+                "Custom OpenAI provider selected but no API key configured. Set it in Settings or use --custom-openai-key."
+            )
     return errors
 
 
+def validate_per_model_config(role: str, config: dict) -> list[str]:
+    """Validate that a per-model config has its required fields.
+
+    Checks:
+    - Provider must be set
+    - Model must be set
+    - Provider-specific global keys must be present (via validate_provider_config)
+
+    Args:
+        role: 'model_a', 'model_b', or 'helper_agent'.
+        config: CONFIG_DATA dict.
+
+    Returns:
+        List of error messages (empty = valid).
+    """
+    errors = []
+    provider_name = config.get(f"{role}_provider")
+    model_name = config.get(f"{role}_model")
+
+    if not provider_name:
+        errors.append(f"{role}: No provider configured. Set it in Settings.")
+    if not model_name:
+        errors.append(f"{role}: No model configured. Set it in Settings.")
+
+    if provider_name:
+        # Check global keys required by the chosen provider
+        prov_errors = validate_provider_config(provider_name, config)
+        errors.extend(prov_errors)
+
+    return errors

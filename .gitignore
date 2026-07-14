@@ -53,6 +53,20 @@ evaluation/performance_latex/
 # ── Package manager lock files (uv generates this on every install) ──
 uv.lock
 
+# ── Runtime temp directory ────────────────────
+temp/
+
+# ── App module build artifacts ────────────────
+app/__pycache__/
+app/**/__pycache__/
+app/*.py[cod]
+
+# ── Log files ─────────────────────────────────
+*.log
+
 # ── Agent / tooling ──────────────────────────
 .agentbridge/
 guidelines.pdf
+*.bak
+.hermes/
+temp/

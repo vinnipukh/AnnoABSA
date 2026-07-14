@@ -150,6 +150,68 @@ function arraysEqual(a: unknown[], b: unknown[]): boolean {
   return JSON.stringify(sa) === JSON.stringify(sb);
 }
 
+// ── Phase 4: Model Config Section (collapsible) ──
+
+const PROVIDER_OPTIONS = [
+  { value: 'ollama', label: 'Ollama (yerel)' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'vllm', label: 'vLLM' },
+  { value: 'custom_openai', label: 'Custom OpenAI' },
+];
+
+function ModelConfigSection({ title, prefix, form, setForm }: {
+  title: string; prefix: string;
+  form: FormState; setForm: React.Dispatch<React.SetStateAction<FormState>>;
+}) {
+  const isConfigured = !!(form[`${prefix}_provider`] as string) && !!(form[`${prefix}_model`] as string);
+  return (
+    <div className="collapse collapse-arrow bg-base-200/50 rounded-xl border border-base-300 mb-2">
+      <input type="checkbox" defaultChecked={false} />
+      <div className="collapse-title text-xs font-bold text-base-content flex items-center gap-2 min-h-0 py-2.5">
+        <svg className={`w-3.5 h-3.5 flex-shrink-0 ${isConfigured ? 'text-success' : 'text-base-content/30'}`} fill="currentColor" viewBox="0 0 24 24">
+          {isConfigured ? (
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+          ) : (
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+          )}
+        </svg>
+        {title}
+      </div>
+      <div className="collapse-content space-y-1 pt-0">
+        <SelectRow label="Sağlayıcı" key_={`${prefix}_provider`}
+          form={form} setForm={setForm} options={PROVIDER_OPTIONS} />
+        <TextRow label="Model" key_={`${prefix}_model`}
+          form={form} setForm={setForm} placeholder="deepseek-v4-flash" />
+        <div className="py-1.5 px-1">
+          <label className="text-xs text-base-content/60 block mb-1">Sıcaklık (Temperature)</label>
+          <div className="flex items-center gap-3">
+            <input
+              type="range" min="0" max="2" step="0.1"
+              value={(form[`${prefix}_temperature`] as number) ?? 0.7}
+              onChange={(e) => setForm(p => ({ ...p, [`${prefix}_temperature`]: parseFloat(e.target.value) }))}
+              className="range range-primary range-xs flex-1"
+            />
+            <span className="text-xs font-mono text-base-content/70 w-8 text-right tabular-nums">
+              {((form[`${prefix}_temperature`] as number) ?? 0.7).toFixed(1)}
+            </span>
+          </div>
+        </div>
+        <div className="py-1.5 px-1">
+          <label className="text-xs text-base-content/60 block mb-1">Prompt</label>
+          <textarea
+            value={(form[`${prefix}_prompt`] as string) ?? ''}
+            onChange={(e) => setForm(p => ({ ...p, [`${prefix}_prompt`]: e.target.value }))}
+            rows={5}
+            className="w-full bg-base-200 border border-base-300 rounded-lg px-2.5 py-1.5 text-xs font-mono text-base-content placeholder-base-content/40 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all resize-y"
+            placeholder="Prompt template..."
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ──
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -177,10 +239,27 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     initial.openai_key = settings.openai_key || '';
     initial.anthropic_key = settings.anthropic_key || '';
     initial.vllm_url = settings.vllm_url || '';
+    initial.custom_openai_url = settings.custom_openai_url || '';
+    initial.custom_openai_key = settings.custom_openai_key || '';
+    initial.custom_openai_model = settings.custom_openai_model || '';
     initial.n_few_shot = settings.n_few_shot ?? 10;
     initial.compare_model_a_name = settings.compare_model_a_name || '';
     initial.compare_model_b_name = settings.compare_model_b_name || '';
     initial.theme = settings.theme || 'dark';
+    // Phase 4: Live Compare Mode
+    initial.compare_mode = settings.compare_mode || 'csv';
+    initial.model_a_provider = settings.model_a_provider || '';
+    initial.model_a_model = settings.model_a_model || '';
+    initial.model_a_prompt = settings.model_a_prompt || '';
+    initial.model_a_temperature = settings.model_a_temperature ?? 0.7;
+    initial.model_b_provider = settings.model_b_provider || '';
+    initial.model_b_model = settings.model_b_model || '';
+    initial.model_b_prompt = settings.model_b_prompt || '';
+    initial.model_b_temperature = settings.model_b_temperature ?? 0.7;
+    initial.helper_agent_provider = settings.helper_agent_provider || '';
+    initial.helper_agent_model = settings.helper_agent_model || '';
+    initial.helper_agent_prompt = settings.helper_agent_prompt || '';
+    initial.helper_agent_temperature = settings.helper_agent_temperature ?? 0.7;
     return initial;
   });
 
@@ -226,6 +305,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     if (changed.compare_model_a_name === '') changed.compare_model_a_name = null;
     if (changed.compare_model_b_name === '') changed.compare_model_b_name = null;
     if (changed.vllm_model === '') changed.vllm_model = null;
+    // Phase 4: empty-string → null for live model config fields
+    if (changed.model_a_provider === '') changed.model_a_provider = null;
+    if (changed.model_a_model === '') changed.model_a_model = null;
+    if (changed.model_a_prompt === '') changed.model_a_prompt = null;
+    if (changed.model_b_provider === '') changed.model_b_provider = null;
+    if (changed.model_b_model === '') changed.model_b_model = null;
+    if (changed.model_b_prompt === '') changed.model_b_prompt = null;
+    if (changed.helper_agent_provider === '') changed.helper_agent_provider = null;
+    if (changed.helper_agent_model === '') changed.helper_agent_model = null;
+    if (changed.helper_agent_prompt === '') changed.helper_agent_prompt = null;
+    if (changed.custom_openai_url === '') changed.custom_openai_url = null;
+    if (changed.custom_openai_key === '') changed.custom_openai_key = null;
+    if (changed.custom_openai_model === '') changed.custom_openai_model = null;
 
     await onSave(changed);
     setSaving(false);
@@ -268,6 +360,38 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </section>
 
           <section>
+            <SectionTitle title="Karşılaştırma Modu" />
+            <div className="flex gap-2 py-1.5 px-1">
+              <button
+                onClick={() => setForm(p => ({ ...p, compare_mode: 'csv' }))}
+                className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all border flex items-center justify-center gap-2 ${
+                  form.compare_mode === 'csv'
+                    ? 'bg-primary text-primary-content border-primary shadow-sm'
+                    : 'bg-base-200 text-base-content/60 border-base-300 hover:text-base-content'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                CSV
+              </button>
+              <button
+                onClick={() => setForm(p => ({ ...p, compare_mode: 'live' }))}
+                className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all border flex items-center justify-center gap-2 ${
+                  form.compare_mode === 'live'
+                    ? 'bg-primary text-primary-content border-primary shadow-sm'
+                    : 'bg-base-200 text-base-content/60 border-base-300 hover:text-base-content'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Canlı
+              </button>
+            </div>
+          </section>
+
+          <section>
             <SectionTitle title="1. Ek Açıklama" />
             <ChipSelector label="Duygu Öğeleri (Sentiment Elements)" key_="sentiment_elements"
               items={ALL_SENTIMENT_ELEMENTS} form={form} setForm={setForm} emptyLabel="En az bir öğe seçin" />
@@ -291,12 +415,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <ToggleRow label="Otomatik AI tahminini devre dışı bırak" key_="disable_ai_automatic_prediction" form={form} setForm={setForm} />
               <ToggleRow label="Yardımcı Asistanı etkinleştir" key_="enable_helper_agent" form={form} setForm={setForm} />
             </div>
+            <TextRow label="AI Kısayol Tuşu (Ctrl+Shift+...)" key_="ai_shortcut_key" form={form} setForm={setForm} placeholder="a" />
             <SelectRow label="LLM Sağlayıcı" key_="llm_provider" form={form} setForm={setForm}
               options={[
                 { value: 'ollama', label: 'Ollama (yerel)' },
                 { value: 'openai', label: 'OpenAI' },
                 { value: 'anthropic', label: 'Anthropic' },
                 { value: 'vllm', label: 'vLLM' },
+                { value: 'custom_openai', label: 'Custom OpenAI' },
               ]}
             />
             <TextRow label="LLM Modeli" key_="llm_model" form={form} setForm={setForm} placeholder="gemma3:4b" />
@@ -304,7 +430,25 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <TextRow label="OpenAI Anahtarı" key_="openai_key" form={form} setForm={setForm} placeholder="sk-..." type="password" />
             <TextRow label="Anthropic Anahtarı" key_="anthropic_key" form={form} setForm={setForm} placeholder="sk-ant-..." type="password" />
             <TextRow label="vLLM URL" key_="vllm_url" form={form} setForm={setForm} placeholder="http://localhost:8001/v1" />
+            <TextRow label="Custom OpenAI URL" key_="custom_openai_url" form={form} setForm={setForm} placeholder="https://api.deepseek.com" />
+            <TextRow label="Custom OpenAI Anahtarı" key_="custom_openai_key" form={form} setForm={setForm} placeholder="sk-..." type="password" />
+            <TextRow label="Custom OpenAI Modeli" key_="custom_openai_model" form={form} setForm={setForm} placeholder="deepseek-v4-flash" />
             <NumberRow label="Few-Shot Örnek Sayısı" key_="n_few_shot" form={form} setForm={setForm} min={0} />
+          </section>
+
+          <section>
+            <SectionTitle title="3a. Model A (Canlı)" />
+            <ModelConfigSection title="Model A Yapılandırması" prefix="model_a" form={form} setForm={setForm} />
+          </section>
+
+          <section>
+            <SectionTitle title="3b. Model B (Canlı)" />
+            <ModelConfigSection title="Model B Yapılandırması" prefix="model_b" form={form} setForm={setForm} />
+          </section>
+
+          <section>
+            <SectionTitle title="3c. Yardımcı Asistan (Canlı)" />
+            <ModelConfigSection title="Helper Agent Yapılandırması" prefix="helper_agent" form={form} setForm={setForm} />
           </section>
 
           <section>
@@ -343,7 +487,21 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
         <div className="flex items-center justify-between px-5 py-3 border-t border-base-300 bg-base-100/90 flex-shrink-0">
           <span className="text-[10px] text-base-content/40">
-            {hasChanged() ? '⚡ Kaydedilmemiş değişiklikler var' : '✓ Tüm ayarlar güncel'}
+            {hasChanged() ? (
+              <span className="flex items-center gap-1">
+                <svg className="w-3 h-3 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Kaydedilmemiş değişiklikler var
+              </span>
+            ) : (
+              <span className="flex items-center gap-1">
+                <svg className="w-3 h-3 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Tüm ayarlar güncel
+              </span>
+            )}
           </span>
           <div className="flex items-center gap-2">
             <button onClick={onClose}

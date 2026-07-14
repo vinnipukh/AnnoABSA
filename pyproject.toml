@@ -15,6 +15,7 @@ dependencies = [
     "nlptoolkit-wordnet",
     "nlptoolkit-dictionary",
     "nlptoolkit-morphologicalanalysis",
+    "scikit-learn",
     "sentence-transformers",
     "transformers",
     "torch",
