@@ -12,13 +12,61 @@ See: `.planning/PROJECT.md` (updated 2026-07-13)
 
 ---
 
-## Current Phase
+**Current Phase**
+Phase 7.5 — Active Learning, Filtering & Autopilot Rework
 
-**Phase 7.4 — 4-Way Polish: Demo, Filters, Auto-Save & Export**
+**Last Completed:** Arrow key navigation (← →) with settings toggle
+  - `arrow_key_navigation` added to Settings interface + useSettings + SettingsPanel toggle
+  - `useEffect` keyboard listener in App.tsx: Left/Right arrows → prev/next review
+  - Guards against triggering while typing in INPUT/TEXTAREA/SELECT
+  - Toggle in Ayarlar → Section 1 → "Ok tuşlarıyla gezinme (← →)"
 
-Plans: 0/4 complete
+---
 
-**Status:** ○ Not started
+## Phase Completion Summary
+
+**Phase 7.1 — Compare Mode UI Rework (13 Jul 2026)**
+- 5/5 plans executed
+- 128 backend + 64 frontend tests passing
+- `FourWayGrid.tsx`, `ResolutionPanel.tsx`, `CompactTripletChip.tsx`, `ReviewHeader.tsx` new
+- 4-way CSV parser (`_detect_newui_columns`, `_load_4way_row`)
+
+**Phase 7.2 — Testing & TypeScript Fixes (14 Jul 2026)**
+- 5/5 plans executed
+- 81 new backend tests (128→209), 23 new frontend tests (64→87) = 296 total
+- 3 pre-existing TS errors resolved (0 remaining)
+- Vite 4→5 upgrade, tsconfig target es5→es2016
+- App.tsx split: 770→250 lines → 5 custom hooks
+- Bug fix: `app/routes/timing.py` — HTTPException no longer swallowed by generic except
+
+**Phase 7.3 — Autonomous Annotation Pipeline (14 Jul 2026)**
+- 6/6 plans executed
+- 18 new backend tests (209→227), 1 new frontend test (87→88) = 315 total
+- 0 new TS errors, clean build
+- 3 new `[[action:...]]` directives added to `DEFAULT_CHAT_TEMPLATE` (selectTriplet, addTriplet, annotateAll)
+- `Ctrl+Shift+L` keyboard shortcut to toggle Active Learning panel
+- `AutoSuggestBanner.tsx` — DaisyUI alert-info banner with Heroicons SVG, accessibility, touch targets
+- `addTriplet(aspect_term, aspect_category, polarity)` 3-arg wrapper in AppActions, fully tested
+- `GET /chat/predictions/{data_idx}` endpoint returning predictions as Turkish text + raw data (18 tests)
+- `annotateAll(count?)` pipeline: predict → filter → addTriplet → saveAndNext → loop, with abort safety and progress toasts
+
+---
+
+## Phase Completion Summary
+
+**Phase 7.1 — Compare Mode UI Rework (13 Jul 2026)**
+- 5/5 plans executed
+- 128 backend + 64 frontend tests passing
+- `FourWayGrid.tsx`, `ResolutionPanel.tsx`, `CompactTripletChip.tsx`, `ReviewHeader.tsx` new
+- 4-way CSV parser (`_detect_newui_columns`, `_load_4way_row`)
+
+**Phase 7.2 — Testing & TypeScript Fixes (14 Jul 2026)**
+- 5/5 plans executed
+- 81 new backend tests (128→209), 23 new frontend tests (64→87) = 296 total
+- 3 pre-existing TS errors resolved (0 remaining)
+- Vite 4→5 upgrade, tsconfig target es5→es2016
+- App.tsx split: 770→250 lines → 5 custom hooks (`useReviewNavigation`, `useAnnotationState`, `useAIPrediction`, `useSettings`, `useCompareMode`)
+- Bug fix: `app/routes/timing.py` — HTTPException no longer swallowed by generic except
 
 ---
 
@@ -33,17 +81,59 @@ Plans: 0/4 complete
 | 5 (Cleanup & Breakup) | ✓ | 8/8 | 100% |
 | 6 (Polish, Autopilot, ML) | ✓ | 10/10 | 100% |
 | 7.1 (Compare UI Rework) | ✓ | 5/5 | 100% |
-| 7.2 (Testing & TS Fixes) | ◐ (planned) | 0/5 | 0% |
-| 7.3 (Autonomous Pipeline) | ○ | 0/6 | 0% |
-| 7.4 (4-Way Polish) | ○ | 0/4 | 0% |
+| **7.2 (Testing & TS Fixes)** | **✓** | **5/5** | **100%** |
+| **7.3 (Autonomous Pipeline)** | **✓** | **6/6** | **100%** |
+| **7.5 (Active Learning Autopilot)** | **I** | **3/3 plans** | **90%** |
 
 ---
 
-## Codebase Map
+## Test Results
+
+| Suite | Count |
+|---|---|
+| Backend (pytest) | **237 passed**, 0 failed (was 227) |
+| Frontend (vitest) | **88 passed**, 0 failed |
+| TypeScript (tsc) | **0 errors** |
+| Emoji in modified files | **0** — App.tsx, FourWayGrid.tsx, ResolutionPanel.tsx all clean |
+
+---
+
+## Risk Register
 
 See: `.planning/codebase/` (7 documents, 2,109 lines)
 
 **Map last updated:** 2026-07-13
+
+---
+
+## Phase 7.4 Deliverables
+
+### Frontend
+- **FourWayGrid.tsx**: CSV column names displayed as subtle monospace labels on grid card headers
+- **demoData.ts**: 6-sample demo data covering all 3 tiers (Tier 1/2: 2 each, Tier 3: 2)
+- **Demo toggle**: 4th mode button — loads FALLBACK_DATA-style demo reviews instead of backend
+- **Tier filter dropdown**: DaisyUI `<select>` with All/Tier 1/2/3 — navigation skips non-matching reviews
+- **Auto-save on prev**: `handlePrevReview` now saves annotations before navigating
+- **Save button**: Heroicons save SVG button in ResolutionPanel header (next to tier badge)
+- **Export button**: "Dışa Aktar" download button in toolbar
+
+### Backend
+- **`GET /data/export-4way`**: New endpoint returning CSV with all original columns + `selected_triplets`, `resolution_tier`, `annotator_notes`
+- **`tests/test_export.py`**: 9 tests covering CSV format, headers, row count, column presence
+
+### Emoji Remediation
+- App.tsx: Removed ◀/▶ from prev/next buttons, all ✅/❌ from toast messages (0 emoji)
+- FourWayGrid.tsx: 0 emoji (already clean)
+- ResolutionPanel.tsx: 0 emoji (already used Heroicons)
+
+## Final Phase 7 Totals
+- Backend tests: 128 → 237 (+109 over Phase 7)
+- Frontend tests: 64 → 88 (+24 over Phase 7)
+- TypeScript errors: 3 → 0
+- Emoji in source: various → 0 in all modified files
+- Vite: 4 → 5.4.21
+- Components: 16 → 21 (AutoSuggestBanner, 5 hooks, demoData)
+- Route modules: 7 → 9 (chat_predictions, export)
 
 ---
 
@@ -61,10 +151,11 @@ See: `.planning/codebase/` (7 documents, 2,109 lines)
 | `cli.py` | Thin wrapper, 6 lines |
 | `models/schemas.py` | Pydantic models |
 | `frontend/src/App.tsx` | Root React component — 4-way mode, dictionary state |
-| `frontend/src/components/` | 20 React components |
-| `frontend/src/hooks/` | useTextSelection, useDarkMode |
-| `frontend/src/types.ts` | TripletItem, Settings (4-way), AppActions |
-| `tests/` | 128 pytest tests |
+| `frontend/src/components/` | 21 React components (new: `AutoSuggestBanner`) |
+| `frontend/src/hooks/` | 6 hooks: `useTextSelection`, `useReviewNavigation`, `useAnnotationState`, `useAIPrediction`, `useSettings`, `useCompareMode` |
+| `frontend/src/types.ts` | TripletItem, Settings (4-way), AppActions (18 methods) |
+| `tests/` | 237 pytest tests (was 128 at Phase 6) |
+| `app/routes/` | 9 route modules (3 new: `chat_predictions`, `export`, `learning`) |
 | `agentdocs/` | Phase plans and reports (being consolidated) |
 | `.planning/` | GSD project planning documents |
 | `.hermes/plans/` | Historical implementation plans |
@@ -84,10 +175,39 @@ See: `.planning/codebase/` (7 documents, 2,109 lines)
 - `_detect_newui_columns()` — Auto-detect NEWUI columns in DataFrame
 - `_load_4way_row()` — Parse single NEWUI CSV row into 8 response fields
 
+---
+
+## Phase 7.2 Deliverables
+
+### New Test Files
+| File | Tests | Target |
+|---|---|---|
+| `tests/test_active_learning.py` | 18 | `services/active_learning.py` |
+| `tests/conftest.py` | — | Shared fixtures (csv_path, app, TestClient) |
+| `tests/test_learning_routes.py` | 16 | `app/routes/learning.py` |
+| `tests/test_cli.py` | 31 | `cli/config.py`, `cli/convert.py`, `cli/runner.py` |
+| `tests/test_routes_misc.py` | 16 | Settings, timing, upload routes |
+
+### Frontend Refactoring
+- `App.tsx` 770→250 lines, 5 custom hooks extracted
+- `frontend/src/hooks/useReviewNavigation.ts` — Index/data/save management
+- `frontend/src/hooks/useAnnotationState.ts` — Triplet selection state
+- `frontend/src/hooks/useAIPrediction.ts` — AI/live prediction state
+- `frontend/src/hooks/useSettings.ts` — Settings fetch/PATCH state
+- `frontend/src/hooks/useCompareMode.ts` — Mode toggle state
+
+### Infrastructure
+- Vite 4→5 (`^5.4.19`), `@vitejs/plugin-react` `^4.4.1`
+- tsconfig: `target: "es5"` → `"es2016"`, `lib: ["es2016"]`
+- 3 TypeScript errors resolved (TSFIX-01, TSFIX-02, TSFIX-03)
+
+### Bug Fix
+- `app/routes/timing.py`: `HTTPException(404)` for out-of-range index was caught by generic `except Exception` and returned as 500. Restructured try/except to pass intentional HTTPExceptions through.
+
 ### Test Results
-- Backend: 128 passed, 0 failed
-- Frontend: 64 passed, 0 failed (51 existing + 13 new ResolutionPanel tests)
-- TypeScript: 0 new errors (3 pre-existing, unchanged)
+- Backend: 209 passed, 0 failed (was 128)
+- Frontend: 87 passed, 0 failed (was 64)
+- TypeScript: 0 errors (was 3)
 
 ---
 
@@ -104,4 +224,4 @@ See: `.planning/codebase/` (7 documents, 2,109 lines)
 
 ---
 
-*STATE.md last updated: 2026-07-13 after Phase 7.1 completion and Phase 7.4 definition*
+*STATE.md last updated: 2026-07-14 — Phase 7.5 started (arrow key navigation + toggle)*

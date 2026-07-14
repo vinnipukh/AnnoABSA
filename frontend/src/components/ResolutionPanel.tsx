@@ -70,8 +70,8 @@ const CloseIcon = ({ className = "w-3 h-3" }: { className?: string }) => (
 
 /* ─── Sentiment badge helper ─── */
 
-function getSentimentBadge(polarity: string): string {
-  const p = polarity.toLowerCase();
+function getSentimentBadge(polarity: string | undefined): string {
+  const p = (polarity || 'neutral').toLowerCase();
   if (p === 'positive' || p === 'pos') return 'text-success bg-success/10 border-success/30';
   if (p === 'negative' || p === 'neg') return 'text-error bg-error/10 border-error/30';
   return 'text-warning bg-warning/10 border-warning/30';
@@ -181,7 +181,7 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
       {/* ── Tier Header ── */}
       <div className={`flex items-start gap-2 px-3 py-2.5 rounded-xl border ${tc.header} mb-2`}>
         <span className="mt-0.5 flex-shrink-0">{tc.icon}</span>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="text-xs font-bold text-base-content">{tc.title}</div>
           <div className="text-[10px] text-base-content/70 leading-relaxed">{tc.text}</div>
         </div>
@@ -290,11 +290,11 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
               Kabul Et (Auto-Accept)
             </button>
             <button
-              onClick={onEditTriplets}
+              onClick={() => setShowManualForm(!showManualForm)}
               className="resolution-panel-btn w-full min-h-[44px] px-3 bg-base-200 hover:bg-base-300 text-base-content/70 rounded-lg text-[10px] transition-all border border-base-300 flex items-center justify-center gap-1.5 select-none"
             >
               <PencilIcon />
-              Düzenle
+              {showManualForm ? 'Kapat' : 'Düzenle'}
             </button>
           </>
         )}
@@ -316,11 +316,11 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
               GT&apos;yi Koru
             </button>
             <button
-              onClick={onEditTriplets}
+              onClick={() => setShowManualForm(!showManualForm)}
               className="resolution-panel-btn w-full min-h-[44px] px-3 bg-base-200 hover:bg-base-300 text-base-content/70 rounded-lg text-[10px] transition-all border border-base-300 flex items-center justify-center gap-1.5 select-none"
             >
               <PencilIcon />
-              Düzenle
+              {showManualForm ? 'Kapat' : 'Düzenle'}
             </button>
           </>
         )}
@@ -420,7 +420,7 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
                       &quot;{t.aspect_term || 'NULL'}&quot;
                     </span>
                     <span className={`px-1 py-0.5 rounded text-[9px] uppercase font-mono border ${getSentimentBadge(t.sentiment_polarity)}`}>
-                      {t.sentiment_polarity}
+                      {t.sentiment_polarity || 'neutral'}
                     </span>
                   </div>
                   <button

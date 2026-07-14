@@ -13,12 +13,14 @@ interface FourWayGridProps {
   onSelectAll: (column: string) => void;
   onClearAll: (column: string) => void;
   modelNames?: { gemma: string; qwen: string; gpt: string };
+  csvColumnNames?: { gemma: string; qwen: string; gpt: string; gt?: string };
 }
 
 const defaultModelNames = { gemma: 'Gemma', qwen: 'Qwen', gpt: 'GPT' };
 
 function ColumnCard({
   title,
+  csvColumnName,
   triplets,
   selectedIds,
   columnKey,
@@ -27,6 +29,7 @@ function ColumnCard({
   onClearAll,
 }: {
   title: string;
+  csvColumnName?: string;
   triplets: TripletItem[];
   selectedIds: Set<string>;
   columnKey: string;
@@ -40,10 +43,17 @@ function ColumnCard({
   return (
     <div className="bg-base-200/80 border border-base-300 rounded-xl p-3 shadow-sm flex flex-col">
       {/* Column header */}
-      <div className="flex items-center justify-between mb-2 min-h-[32px]">
-        <h4 className="text-sm font-bold text-base-content tracking-tight">
-          {title}
-        </h4>
+      <div className="flex items-start justify-between mb-2 min-h-[32px]">
+        <div className="flex flex-col min-w-0">
+          <h4 className="text-sm font-bold text-base-content tracking-tight">
+            {title}
+          </h4>
+          {csvColumnName && (
+            <div className="text-[10px] text-base-content/40 font-mono truncate leading-tight">
+              {csvColumnName}
+            </div>
+          )}
+        </div>
         {triplets.length > 0 && (
           <div className="flex items-center gap-1">
             <button
@@ -127,6 +137,7 @@ export const FourWayGrid: React.FC<FourWayGridProps> = ({
   onSelectAll,
   onClearAll,
   modelNames,
+  csvColumnNames,
 }) => {
   const names = { ...defaultModelNames, ...modelNames };
 
@@ -150,6 +161,7 @@ export const FourWayGrid: React.FC<FourWayGridProps> = ({
         {/* GT — top-left */}
         <ColumnCard
           title="GT"
+          csvColumnName={csvColumnNames?.gt}
           triplets={gtTriplets}
           selectedIds={selectedIds['gt'] || new Set()}
           columnKey="gt"
@@ -161,6 +173,7 @@ export const FourWayGrid: React.FC<FourWayGridProps> = ({
         {/* Gemma — top-right */}
         <ColumnCard
           title={names.gemma}
+          csvColumnName={csvColumnNames?.gemma}
           triplets={gemmaTriplets}
           selectedIds={selectedIds['gemma'] || new Set()}
           columnKey="gemma"
@@ -172,6 +185,7 @@ export const FourWayGrid: React.FC<FourWayGridProps> = ({
         {/* Qwen — bottom-left */}
         <ColumnCard
           title={names.qwen}
+          csvColumnName={csvColumnNames?.qwen}
           triplets={qwenTriplets}
           selectedIds={selectedIds['qwen'] || new Set()}
           columnKey="qwen"
@@ -183,6 +197,7 @@ export const FourWayGrid: React.FC<FourWayGridProps> = ({
         {/* GPT — bottom-right */}
         <ColumnCard
           title={names.gpt}
+          csvColumnName={csvColumnNames?.gpt}
           triplets={gptTriplets}
           selectedIds={selectedIds['gpt'] || new Set()}
           columnKey="gpt"

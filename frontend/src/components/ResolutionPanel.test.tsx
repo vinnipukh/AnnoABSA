@@ -254,19 +254,24 @@ describe('ResolutionPanel', () => {
     expect(onAccept).toHaveBeenCalledWith(gtTripletsDiff);
   });
 
-  it('calls onEditTriplets when Düzenle clicked', () => {
-    const onEdit = vi.fn();
+  it('toggles manual form when Düzenle clicked', () => {
     const { container } = render(
       <ResolutionPanel
         {...defaultProps}
-        onEditTriplets={onEdit}
       />
     );
 
-    const editBtn = findByText(container, /Düzenle/);
-    click(editBtn);
+    // Initially no form visible, button says Düzenle
+    expect(findByText(container, /Düzenle/)).not.toBeNull();
+    expect(findByText(container, 'Kapat')).toBeNull();
 
-    expect(onEdit).toHaveBeenCalledTimes(1);
+    // Find the Düzenle button and click
+    const düzenleBtn = findByText(container, /Düzenle/);
+    click(düzenleBtn);
+
+    // After click, button text becomes Kapat
+    const kapatBtn = findByText(container, 'Kapat') as HTMLElement;
+    expect(kapatBtn).not.toBeNull();
   });
 
   /* ─── Manual form functionality ─── */

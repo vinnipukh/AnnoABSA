@@ -22,19 +22,6 @@ export default defineConfig({
   },
   build: {
     outDir: 'build'
-  },
-  esbuild: {
-    include: /src\/.*\.[jt]sx?$/,
-    exclude: []
-  },
-  optimizeDeps: {
-    esbuildOptions: {
-      loader: {
-        '.js': 'jsx',
-        '.ts': 'ts',
-        '.tsx': 'tsx'
-      }
-    }
   }
 })
 

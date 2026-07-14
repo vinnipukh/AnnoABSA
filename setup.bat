@@ -73,7 +73,11 @@ echo   How to run
 echo ============================================
 echo.
 echo   .venv\Scripts\activate
-echo   python cli.py examples\semeval_reviews.csv
+echo   python cli.py examples\semeval_tr_llm_annotated.csv
+echo.
+echo   The app opens in 4-Way Comparison mode by default.
+echo   Use the 'Tahmin Et' button to get ML-based label
+echo   suggestions for the current review.
 echo.
 echo   With LLM predictions:
 echo   python cli.py --data-path examples\semeval_reviews.csv --llm-provider ollama
@@ -97,10 +101,10 @@ echo ============================================
 echo   Running tests
 echo ============================================
 echo.
-echo   REM Backend tests (128 pytest)
+echo   REM Backend tests (224 pytest)
 echo   pytest tests/ -q
 echo.
-echo   REM Frontend tests (64 vitest)
+echo   REM Frontend tests (94 vitest)
 echo   cd frontend ^&^& npx vitest run
 echo.
 echo ============================================
@@ -110,6 +114,7 @@ echo.
 echo   - NLP models (BERT, e5-small) download on first use to %%USERPROFILE%%\.cache\huggingface\
 echo   - First requests to /nlp/sentiment and /nlp/embedding-similarity may be slow.
 echo   - The Welcome Overlay on first load shows quick start options.
-echo   - Active Learning suggestions appear after annotating at least 2 reviews.
+echo   - ML predictions (Tahmin Et button) train on user-annotated
+echo     reviews using TF-IDF + LogisticRegression.
 echo.
 pause

@@ -38,6 +38,8 @@ def post_timing(data_idx: int, timing: dict):
     except FileNotFoundError:
         raise HTTPException(
             status_code=404, detail=f"{DATA_FILE_PATH} not found")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -77,6 +77,7 @@ const defaultSettings: Settings = {
   custom_openai_url: null,
   custom_openai_key: null,
   custom_openai_model: null,
+  arrow_key_navigation: true,
 };
 
 describe('SettingsPanel', () => {

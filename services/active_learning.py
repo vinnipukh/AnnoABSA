@@ -13,7 +13,6 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-from scipy.stats import entropy
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.multiclass import OneVsRestClassifier
@@ -72,11 +71,25 @@ def labeled_texts_from_data(data, file_type: str):
                 label_sets.append([])
     else:
         # CSV / DataFrame
+        has_original_label = "original_label" in data.columns
+        # In 4-way NEWUI CSVs, original_label = GT model output, not user annotation.
+        # Skip the fallback when model-label columns exist (dataframe is 4-way).
+        is_newui = has_original_label and any(
+            col in data.columns for col in ("gemma4_31b_label", "majority_vote", "gpt_oss_120b_label", "qwen3.6_35b_label")
+        )
+
         for _, row in data.iterrows():
             text = row.get("text", "")
             texts.append(text)
 
-            raw_label = row.get("label", "")
+            # Only use the 'label' column for user annotations in 4-way mode.
+            # In standard mode, fall back to original_label as a compatible source.
+            raw_label = row.get("label")
+            if raw_label is None or pd.isna(raw_label) or str(raw_label).strip() in ("", "[]"):
+                if not is_newui:
+                    raw_label = row.get("original_label") or ""
+                else:
+                    raw_label = ""
             if pd.isna(raw_label) or str(raw_label).strip() in ("", "[]"):
                 label_sets.append([])
                 continue
@@ -94,8 +107,14 @@ def labeled_texts_from_data(data, file_type: str):
             if isinstance(parsed, list):
                 labels = []
                 for lbl in parsed:
-                    cat = lbl.get("aspect_category", lbl.get("category", ""))
-                    pol = lbl.get("sentiment_polarity", lbl.get("polarity", ""))
+                    if isinstance(lbl, (list, tuple)):
+                        # Tuple format: (aspect_term, aspect_category, polarity)
+                        cat = str(lbl[1]) if len(lbl) > 1 else ""
+                        pol = str(lbl[2]) if len(lbl) > 2 else ""
+                    else:
+                        # Dict format: {"aspect_category": ..., "sentiment_polarity": ...}
+                        cat = lbl.get("aspect_category", lbl.get("category", ""))
+                        pol = lbl.get("sentiment_polarity", lbl.get("polarity", ""))
                     if cat and pol:
                         labels.append(f"{cat}__{pol}")
                 label_sets.append(labels)
@@ -149,42 +168,3 @@ def train_labeled_data(texts, labels) -> Optional[dict]:
         model.fit(x_labeled, y_labeled)
 
     return {"model": model, "label_columns": all_labels}
-
-
-def get_uncertainty_scores(model_data: dict, texts: list) -> np.ndarray:
-    """Compute entropy-based uncertainty scores for unlabeled texts.
-
-    Higher scores = more uncertain (better candidates for annotation).
-
-    For each text, entropy is computed across the binary predictions for every
-    label: ``H = -sum(p * log(p) + (1-p) * log(1-p))``.
-
-    Parameters
-    ----------
-    model_data : dict
-        Output from :func:`train_labeled_data` — must contain ``'model'``
-        and ``'label_columns'``.
-    texts : list[str]
-        Texts to score.
-
-    Returns
-    -------
-    np.ndarray
-        Entropy score per text (higher = more uncertain).
-    """
-    model = model_data["model"]
-    n_labels = len(model_data["label_columns"])
-
-    proba = model.predict_proba(texts)
-    # proba shape: (n_texts, n_labels) — each column is P(positive) for that
-    # binary OneVsRest classifier.
-    entropy_scores = np.zeros(len(texts))
-    for label_idx in range(n_labels):
-        p_pos = proba[:, label_idx]
-        # Avoid log(0) by clipping
-        p_pos = np.clip(p_pos, 1e-15, 1 - 1e-15)
-        p_neg = 1.0 - p_pos
-        label_entropy = -p_pos * np.log(p_pos) - p_neg * np.log(p_neg)
-        entropy_scores += label_entropy
-
-    return entropy_scores

@@ -197,10 +197,32 @@ def _load_4way_row(row: pd.Series, row_dict: dict) -> dict | None:
         except Exception:
             return []
 
-    result["majority_label"] = _parse_list_field(
-        row_dict.get("majority_label"))
-    result["consensus_intersection"] = _parse_list_field(
-        row_dict.get("consensus_intersection"))
+    def _tuples_to_triplets(raw_items, prefix: str) -> list[dict]:
+        """Convert raw tuple/list items from CSV into TripletItem dicts with unique IDs.
+        Handles: [('term', 'CAT', 'pol'), ...] or [{'aspect_category': ...}, ...]
+        """
+        result = []
+        for i, item in enumerate(raw_items):
+            if isinstance(item, (list, tuple)) and len(item) >= 3:
+                result.append({
+                    "id": f"{prefix}_{i}",
+                    "aspect_term": str(item[0]) if item[0] else "NULL",
+                    "aspect_category": str(item[1]),
+                    "sentiment_polarity": str(item[2]).lower(),
+                })
+            elif isinstance(item, dict):
+                result.append({
+                    "id": f"{prefix}_{i}",
+                    "aspect_term": str(item.get("aspect_term", item.get("term", ""))) or "NULL",
+                    "aspect_category": str(item.get("aspect_category", item.get("category", ""))),
+                    "sentiment_polarity": str(item.get("sentiment_polarity", item.get("polarity", ""))).lower(),
+                })
+        return result
+
+    result["majority_label"] = _tuples_to_triplets(
+        _parse_list_field(row_dict.get("majority_label")), "ml")
+    result["consensus_intersection"] = _tuples_to_triplets(
+        _parse_list_field(row_dict.get("consensus_intersection")), "ci")
 
     raw_diff = row_dict.get("original_llm_diff", "")
     result["original_llm_diff"] = "" if str(raw_diff) in (

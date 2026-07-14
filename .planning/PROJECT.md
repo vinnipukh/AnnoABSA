@@ -36,27 +36,30 @@ A researcher can efficiently annotate Turkish reviews for ABSA triplets (aspect 
 - ✓ **4-Way Compare Mode (NEWUI)** — 2x2 grid (GT + Gemma + Qwen + GPT), compact triplet chips, consensus diamond, 3-tier resolution panel — Phase 7.1
 - ✓ **NEWUI CSV parser** — `_load_4way_row()` for `semeval_tr_llm_annotated.csv` with `majority_vote`, `majority_label`, `consensus_intersection`, `original_llm_diff` — Phase 7.1
 - ✓ **Resolution panel tests** — 13 vitest tests for 3-tier curation logic — Phase 7.1
+- ✓ **Active learning tests** — 18 pytest tests for `services/active_learning.py` (train, predict, uncertainty scoring) — Phase 7.2
+- ✓ **Learning route tests** — 16 pytest tests for `app/routes/learning.py` via TestClient — Phase 7.2
+- ✓ **CLI tests** — 31 pytest tests for `cli/config.py`, `cli/convert.py`, `cli/runner.py` — Phase 7.2
+- ✓ **Endpoint tests (misc routes)** — 16 pytest tests for settings/timing/upload — Phase 7.2
+- ✓ **3 TS errors fixed** — `rect`, `global`, `includes` resolved (0 remaining) — Phase 7.2
+- ✓ **Vite 4→5 upgrade** — `^5.4.19`, deprecated esbuild config removed — Phase 7.2
+- ✓ **App.tsx split** — 770→250 lines, 5 custom hooks extracted, 4 hook test files (87 total frontend tests) — Phase 7.2
+- ✓ **Timing route bug fix** — HTTPException(404) no longer swallowed as 500 by generic except — Phase 7.2
+- ✓ **3 `[[action:...]]` directives** — `selectTriplet`, `addTriplet`, `annotateAll` added to DEFAULT_CHAT_TEMPLATE (15 total) — Phase 7.3
+- ✓ **Ctrl+Shift+L shortcut** — toggles Active Learning panel, ref-forwarded callback pattern — Phase 7.3
+- ✓ **Auto-suggest banner** — `AutoSuggestBanner.tsx`, DaisyUI alert-info, Heroicons SVG, accessibility — Phase 7.3
+- ✓ **addTriplet 3-arg wrapper** — `addTriplet(term, category, polarity)` in AppActions, fully tested — Phase 7.3
+- ✓ **Chat predictions endpoint** — `GET /chat/predictions/{idx}` returning Turkish text + predictions, 18 tests — Phase 7.3
+- ✓ **annotateAll() pipeline** — predict → filter → addTriplet → saveAndNext → loop, abort safety, progress toasts — Phase 7.3
+- ✓ **CSV column names on grid headers** — monospace labels on 2x2 card headers — Phase 7.4
+- ✓ **Demo mode toggle** — 4th mode button, 6-sample demo data covering all 3 tiers — Phase 7.4
+- ✓ **Tier filter dropdown** — All/Tier 1/2/3 filtering review queue on navigation — Phase 7.4
+- ✓ **Auto-save on navigation** — prev and next both save with toast confirmation — Phase 7.4
+- ✓ **Save button in resolution panel** — Heroicons save SVG, `aria-label="Kaydet"` — Phase 7.4
+- ✓ **CSV export endpoint** — `GET /data/export-4way` with all columns + annotation fields, 9 tests — Phase 7.4
 
 ### Active
 
-- [ ] **NEWUI-11**: Display CSV column names on 2x2 grid card headers — Phase 7.4
-- [ ] **NEWUI-12**: Demo mode with pre-built sample data showing all 3 tier scenarios — Phase 7.4
-- [ ] **NEWUI-13**: Tier filter dropdown (All / Tier 1 / 2 / 3) — Phase 7.4
-- [ ] **NEWUI-14**: Auto-save on review navigation — Phase 7.4
-- [ ] **NEWUI-15**: Save button in resolution panel — Phase 7.4
-- [ ] **NEWUI-16**: CSV export endpoint for 4-way results — Phase 7.4
-- [ ] **TEST-01**: Tests for `services/active_learning.py` (train, predict, uncertainty scoring) — Phase 7
-- [ ] **TEST-02**: Tests for `app/routes/learning.py` endpoint — Phase 7
-- [ ] **TEST-03**: Tests for `cli/` package (config, convert, runner smoke tests) — Phase 7
-- [ ] **TEST-04**: Endpoint tests for `app/routes/settings.py`, `timing.py`, `upload.py` — Phase 7
-- [ ] **TSFIX-01**: Fix 3 pre-existing TS errors (`rect`, `global`, `includes`) — Phase 7
-- [ ] **AUTOPILOT-01**: Backend prompt teaching LLM to generate `[[action:...]]` directives — Phase 7
-- [ ] **AUTOPILOT-02**: Keyboard shortcut for Active Learning panel (Ctrl+Shift+L) — Phase 7
-- [ ] **AUTOPILOT-03**: Auto-suggest banner on uncertain reviews — Phase 7
-- [ ] **AUTOPILOT-04**: `selectTriplet(role, id)` per-triplet selection action — Phase 7
-- [ ] **AUTOPILOT-05**: `addTriplet(aspect_term, aspect_category, polarity)` manual triplet creation — Phase 7
-- [ ] **AUTOPILOT-06**: Endpoint returning AI predictions in chat response — Phase 7
-- [ ] **AUTOPILOT-07**: `annotateAll()` pipeline action (predict → select → save → next) — Phase 7
+*(None — Phase 7 fully complete!)*
 
 ### Out of Scope
 
@@ -67,12 +70,14 @@ A researcher can efficiently annotate Turkish reviews for ABSA triplets (aspect 
 
 ## Context
 
-- **Stack:** Python 3.11, FastAPI, uvicorn / React 19, TypeScript 5.9, Vite 4, Tailwind CSS 3, DaisyUI 4
+- **Stack:** Python 3.11, FastAPI, uvicorn / React 19, TypeScript 5.9, Vite 5, Tailwind CSS 3, DaisyUI 4
 - **ML/NLP:** scikit-learn, transformers, torch, sentence-transformers, rank-bm25, nlptoolkit-* (SentiNet, WordNet, Dictionary, MorphologicalAnalysis)
 - **LLM Providers:** Ollama (localhost:11434), OpenAI, Anthropic, vLLM, Custom OpenAI (any OpenAI-compatible API)
-- **Testing:** 128 pytest (backend) + 64 vitest (frontend) = 192 automated tests; ~60 manual browser cases
+- **Testing:** 237 pytest (backend) + 88 vitest (frontend) = 325 automated tests
 - **Data:** CSV or JSON files, auto-detected from extension, loaded/saved via `load_data()`/`save_data()` in `app/data.py`
-- **Dev history:** 7 completed phases (Phase 7.1: 4-Way Compare Mode with 3-tier curation)
+- **Dev history:** 7 completed phases (Phases 1-6) + 4 Phase 7 sub-phases fully complete. Backend: 237 tests. Frontend: 88 tests. 0 TS errors.
+- **Route modules:** 9 (`nlp`, `settings`, `reviews`, `ai`, `timing`, `upload`, `learning`, `chat_predictions`, `export`)
+- **Frontend components:** 21 React components + 7 custom hooks + demo data module
 - **Known issues:**
   - `data.py` import staleness: `from app.config import X` creates by-value copies; prefer `import app.config as cfg`
   - CORS allows all origins (`*`) — no authentication
@@ -103,8 +108,10 @@ A researcher can efficiently annotate Turkish reviews for ABSA triplets (aspect 
 | `data-theme` DaisyUI theming over CSS dark mode | DaisyUI handles theme colors natively via semantic classes | ✓ Good |
 | Lazy-loaded NLP models | Zero startup time; models load on first use (10-30s delay acceptable) | ✓ Good |
 | Separate CSV vs Live state in App.tsx | Clear state management; no merge logic between modes | ✓ Good |
-| `[[action:...]]` inline directives for autopilot | Hybrid text+actions keeps chat natural while enabling programmatic control | — Pending |
+| `[[action:...]]` inline directives for autopilot | Hybrid text+actions keeps chat natural while enabling programmatic control | ✓ Good — 15 actions registered, full pipeline functional |
 | Separate endpoint for Live predictions | Zero risk of breaking AI Suggestions; independent validation rules | ✓ Good |
+| `createRoot` + `flushSync` for React 19 tests | Bypasses `@testing-library/react` CJS `act` bug | ✓ Good |
+| Frontend `FALLBACK_DATA` / `DEMO_DATA` for demo mode | No backend dependency for demo; reusable pattern | ✓ Good |
 
 ## Evolution
 
@@ -124,4 +131,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-13 after Phase 7.1 completion*
+*Last updated: 2026-07-14 — Phase 7 fully complete (all 4 sub-phases, 237+88 tests)*

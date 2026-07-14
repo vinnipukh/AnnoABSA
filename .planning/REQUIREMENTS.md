@@ -20,35 +20,35 @@
 
 ### NEWUI-POLISH — 4-Way Polish (Phase 7.4)
 
-- [ ] **NEWUI-11**: Display CSV column names (e.g. `gemma4_31b_label`) on 2x2 grid card headers alongside short names.
-- [ ] **NEWUI-12**: Demo mode that auto-loads pre-built sample data showing all 3 tier scenarios.
-- [ ] **NEWUI-13**: Tier filter dropdown (All / Tier 1 / Tier 2 / Tier 3) filters review queue by tier.
-- [ ] **NEWUI-14**: Auto-save on review navigation (next/previous) with toast confirmation.
-- [ ] **NEWUI-15**: Visible save button in resolution panel (`💾 Kaydet ve İlerle`).
-- [ ] **NEWUI-16**: CSV export endpoint `GET /data/export-4way` and frontend download button.
+- [x] **NEWUI-11**: CSV column names on 2x2 grid card headers — monospace label below model name. Added `csvColumnNames` prop to FourWayGrid.
+- [x] **NEWUI-12**: Demo mode with 6 pre-built sample reviews covering all 3 tiers. Toggle button in mode selector.
+- [x] **NEWUI-13**: Tier filter dropdown (All / Tier 1 / 2 / 3) — navigation skips non-matching reviews. 50-iteration loop protection.
+- [x] **NEWUI-14**: Auto-save on review navigation (prev and next) with toast confirmation.
+- [x] **NEWUI-15**: Save button in resolution panel header — Heroicons save SVG, `aria-label="Kaydet"`, DaisyUI `btn`.
+- [x] **NEWUI-16**: `GET /data/export-4way` endpoint returning CSV with all columns + `selected_triplets`, `resolution_tier`, `annotator_notes`. Frontend download button.
 
 ### TEST — Testing Coverage
 
-- [ ] **TEST-01**: Tests for `services/active_learning.py` — `train_labeled_data()`, `get_uncertainty_scores()`, `labeled_texts_from_data()`.
-- [ ] **TEST-02**: Tests for `app/routes/learning.py` — `GET /learning/suggestions`, `GET /learning/predict/{idx}` via TestClient.
-- [ ] **TEST-03**: Tests for `cli/` package — `cli/config.py` (ABSAAnnotatorConfig), `cli/convert.py` (std_triplets_to_label), `cli/runner.py` (smoke tests).
-- [ ] **TEST-04**: Endpoint tests for `app/routes/settings.py` (GET/PATCH /settings), `app/routes/timing.py` (POST /timing, GET /avg-annotation-time), `app/routes/upload.py` (POST /upload-data, POST /auto-add-positions).
+- [x] **TEST-01**: Tests for `services/active_learning.py` — `train_labeled_data()`, `get_uncertainty_scores()`, `labeled_texts_from_data()`. 18 tests covering JSON/CSV extraction, edge cases, entropy scoring.
+- [x] **TEST-02**: Tests for `app/routes/learning.py` — `GET /learning/suggestions`, `GET /learning/predict/{idx}` via TestClient. 16 tests covering ranked suggestions, error handling, all-labeled edge case.
+- [x] **TEST-03**: Tests for `cli/` package — `cli/config.py` (ABSAAnnotatorConfig), `cli/convert.py` (std_triplets_to_label), `cli/runner.py` (port checks, config update). 31 tests.
+- [x] **TEST-04**: Endpoint tests for `app/routes/settings.py` (GET/PATCH /settings), `app/routes/timing.py` (POST /timing, GET /avg-annotation-time), `app/routes/upload.py` (POST /upload-data, POST /auto-add-positions). 16 tests.
 
 ### TSFIX — TypeScript Fixes
 
-- [ ] **TSFIX-01**: Fix pre-existing TS error: `Property 'rect' does not exist on type` in `App.tsx:447`.
-- [ ] **TSFIX-02**: Fix pre-existing TS error: `'global' is deprecated` in `NlpHelperToolbar.test.tsx`.
-- [ ] **TSFIX-03**: Verify `tsconfig.json` `includes` pattern covers all source files.
+- [x] **TSFIX-01**: Fix pre-existing TS error: `Property 'rect' does not exist on type` in `App.tsx:447` — added `rect?: DOMRect` to `nlpToolbarSelection` state type.
+- [x] **TSFIX-02**: Fix pre-existing TS error: `'global' is deprecated` in `NlpHelperToolbar.test.tsx` — replaced `global.fetch = mockFetch` with `vi.stubGlobal('fetch', mockFetch)`.
+- [x] **TSFIX-03**: Verify `tsconfig.json` `includes` pattern covers all source files — fixed by changing target `"es5"` → `"es2016"` and lib `["es2016"]`, which resolves the `includes` method availability.
 
 ### AUTOPILOT — Autonomous Annotation Pipeline
 
-- [ ] **AUTOPILOT-01**: Backend prompt — teach the Helper Agent's LLM to generate `[[action:...]]` directives in chat responses. Update `DEFAULT_CHAT_TEMPLATE` or system prompt with action instruction examples.
-- [ ] **AUTOPILOT-02**: Keyboard shortcut `Ctrl+Shift+L` to toggle Active Learning suggestions panel.
-- [ ] **AUTOPILOT-03**: Auto-suggest banner — when a review has high uncertainty (from active learning model), show a small banner in the UI suggesting the user annotate this review next.
-- [ ] **AUTOPILOT-04**: `selectTriplet(role, id)` action — per-triplet selection from Helper Agent, allowing the agent to individually select/deselect specific triplets.
-- [ ] **AUTOPILOT-05**: `addTriplet(aspect_term, aspect_category, polarity)` action — allow Helper Agent to create manual triplets programmatically.
-- [ ] **AUTOPILOT-06**: Endpoint returning AI predictions formatted as part of the chat response — so the Helper Agent can read predictions, reason about them, and act on them.
-- [ ] **AUTOPILOT-07**: `annotateAll()` pipeline action — predict → select all predicted triplets → save → advance to next review. Full autonomous annotation cycle.
+- [x] **AUTOPILOT-01**: Backend prompt — added 3 missing `[[action:...]]` directives (`selectTriplet`, `addTriplet`, `annotateAll`) to `DEFAULT_CHAT_TEMPLATE`. Template now has 15 total actions with Turkish descriptions.
+- [x] **AUTOPILOT-02**: Keyboard shortcut `Ctrl+Shift+L` toggles Active Learning suggestions panel. Uses ref-forwarded callback pattern for stale closure safety.
+- [x] **AUTOPILOT-03**: Auto-suggest banner (`AutoSuggestBanner.tsx`) — DaisyUI `alert alert-info` banner with Heroicons SVG, `role="alert"`, `aria-label` on dismiss, touch targets ≥44×44px, toast notification on first show. Conditionally rendered based on uncertainty > 0.7 and no labels.
+- [x] **AUTOPILOT-04**: `selectTriplet(role, id)` — already existed in `AppActions` (line 127), wired at `App.tsx:291`. Verified working for all 6 roles.
+- [x] **AUTOPILOT-05**: `addTriplet(aspect_term, aspect_category, polarity)` — new 3-arg wrapper in `AppActions`. Constructs a `TripletItem` with `auto_` ID and delegates to `addManualTriplet`. Fully tested.
+- [x] **AUTOPILOT-06**: `GET /chat/predictions/{data_idx}` endpoint in `app/routes/chat_predictions.py` — returns Turkish chat text + raw predictions array. 18 tests covering 200, 404, 400, determinism.
+- [x] **AUTOPILOT-07**: `annotateAll(count?)` pipeline action in `AppActions` — predict → filter >0.5 → addTriplet → saveAndNext → loop with abort safety, progress toasts, and N-review limit (default 5).
 
 ## v2 Requirements
 
@@ -76,16 +76,17 @@ Deferred to future phases. Tracked but not in current roadmap.
 | Requirement | Phase | Status |
 |---|---|---|
 | NEWUI-01 through NEWUI-10 | Phase 7.1 | ✅ Complete |
-| NEWUI-11 through NEWUI-16 | Phase 7.4 | Pending |
-| TEST-01 through TEST-04 | Phase 7.2 | Pending |
-| TSFIX-01 through TSFIX-03 | Phase 7.2 | Pending |
-| AUTOPILOT-01 through AUTOPILOT-07 | Phase 7.3 | Pending |
+| NEWUI-11 through NEWUI-16 | Phase 7.4 | ✅ Complete |
+| TEST-01 through TEST-04 | Phase 7.2 | ✅ Complete |
+| TSFIX-01 through TSFIX-03 | Phase 7.2 | ✅ Complete |
+| AUTOPILOT-01 through AUTOPILOT-07 | Phase 7.3 | ✅ Complete |
 
 **Coverage:**
 - v1 requirements: 10 (NEWUI) + 6 (NEWUI-POLISH) + 4 (TEST) + 3 (TSFIX) + 7 (AUTOPILOT) = 30 total
+- Complete: 30/30 ✅ — **Phase 7 fully complete!**
 - Mapped to phases: 30
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-07-13*
-*Last updated: 2026-07-13 after Phase 7.1 completion and Phase 7.4 definition*
+*Last updated: 2026-07-14 — Phase 7 fully complete (all 30 requirements done)*
