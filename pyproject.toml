@@ -20,4 +20,5 @@ dependencies = [
     "transformers",
     "torch",
     "setuptools<75",
+    "pytest<10",
 ]
