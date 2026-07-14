@@ -50,6 +50,8 @@ export interface ReviewComparisonData {
   majority_label?: string;
   consensus_intersection?: TripletItem[];
   original_llm_diff?: TripletItem[];
+  uncertainty?: number;
+  has_labels?: boolean;
 }
 
 export interface ChatMessage {
@@ -104,6 +106,7 @@ export interface Settings {
   custom_openai_url: string | null;
   custom_openai_key: string | null;
   custom_openai_model: string | null;
+  arrow_key_navigation: boolean;
 }
 
 /**
@@ -125,6 +128,7 @@ export interface AppActions {
   selectTriplet: (role: 'model_a' | 'model_b' | 'gt' | 'gemma' | 'qwen' | 'gpt', id: string) => void;
   selectAllTriplets: (role: 'model_a' | 'model_b' | 'gt' | 'gemma' | 'qwen' | 'gpt') => void;
   clearAllTriplets: (role: 'model_a' | 'model_b' | 'gt' | 'gemma' | 'qwen' | 'gpt') => void;
+  addTriplet: (aspect_term: string, aspect_category: string, sentiment_polarity: string) => void;
   addManualTriplet: (triplet: TripletItem) => void;
   removeManualTriplet: (id: string) => void;
   saveAndNext: () => Promise<void>;
@@ -132,4 +136,6 @@ export interface AppActions {
   triggerLivePrediction: (role: 'model_a' | 'model_b') => Promise<void>;
   clearAll: () => void;
   openSettings: () => void;
+  annotateAll: () => Promise<void>;
+  runAutopilot: () => Promise<void>;
 }

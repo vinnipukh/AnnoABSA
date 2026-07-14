@@ -73,11 +73,15 @@ def app(csv_path):
 
     # Import main after env is set
     import main
+    import app.config as app_cfg
     from app.config import CONFIG_DATA as _cfg
 
-    # Ensure the data file is properly set
+    # Ensure the data file globals are correct.  ``main.DATA_FILE_PATH``
+    # is a *copy* of the string — updating it alone does NOT propagate
+    # to ``app.config``, which is what ``app.data.load_data()`` reads.
+    app_cfg.DATA_FILE_PATH = csv_path
+    app_cfg.DATA_FILE_TYPE = "csv"
     main.DATA_FILE_PATH = csv_path
-    main.DATA_FILE_TYPE = "csv"
     # Seed with few-shot example on row 1 — mutate in-place so
     # app.config.CONFIG_DATA (imported by route files) stays in sync
     _cfg.clear()

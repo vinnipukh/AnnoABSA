@@ -242,6 +242,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     initial.custom_openai_url = settings.custom_openai_url || '';
     initial.custom_openai_key = settings.custom_openai_key || '';
     initial.custom_openai_model = settings.custom_openai_model || '';
+    initial.arrow_key_navigation = settings.arrow_key_navigation ?? true;
     initial.n_few_shot = settings.n_few_shot ?? 10;
     initial.compare_model_a_name = settings.compare_model_a_name || '';
     initial.compare_model_b_name = settings.compare_model_b_name || '';
@@ -405,6 +406,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <ToggleRow label="Token'a tıkla (Click-on-Token)" key_="click_on_token" form={form} setForm={setForm} />
               <ToggleRow label="Pozisyonları kaydet" key_="save_phrase_positions" form={form} setForm={setForm} />
               <ToggleRow label="İfadeleri otomatik temizle" key_="auto_clean_phrases" form={form} setForm={setForm} />
+              <ToggleRow label="Ok tuşlarıyla gezinme (← →)" key_="arrow_key_navigation" form={form} setForm={setForm} />
             </div>
           </section>
 

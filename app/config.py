@@ -89,7 +89,7 @@ def load_config():
         "helper_agent_prompt_template": DEFAULT_CHAT_TEMPLATE,
         "theme": "dark",
         # Phase 4: Live Compare Mode config
-        "compare_mode": "csv",
+        "compare_mode": "4way",
         "model_a_provider": None,
         "model_a_model": None,
         "model_a_prompt": DEFAULT_LABELING_TEMPLATE,

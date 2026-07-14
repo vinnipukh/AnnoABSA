@@ -10,11 +10,13 @@ from app.positions import auto_add_missing_positions  # noqa: F401
 
 from app.routes.nlp import router as nlp_router
 from app.routes.settings import router as settings_router
+from app.routes.export import router as export_router
 from app.routes.reviews import router as reviews_router
 from app.routes.ai import router as ai_router
 from app.routes.timing import router as timing_router
 from app.routes.upload import router as upload_router
 from app.routes.learning import router as learning_router
+from app.routes.chat_predictions import router as chat_predictions_router
 
 app = FastAPI()
 
@@ -28,11 +30,13 @@ app.add_middleware(
 
 app.include_router(nlp_router)
 app.include_router(settings_router)
+app.include_router(export_router)
 app.include_router(reviews_router)
 app.include_router(ai_router)
 app.include_router(timing_router)
 app.include_router(upload_router)
 app.include_router(learning_router)
+app.include_router(chat_predictions_router)
 
 
 @app.on_event("startup")
