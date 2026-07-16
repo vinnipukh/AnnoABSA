@@ -31,6 +31,7 @@
 **Requirements:** TEST-01 through TEST-04, TSFIX-01 through TSFIX-03
 
 **Results:**
+
 - 81 new backend tests + 23 new frontend tests
 - 3 TS errors resolved (0 remaining)
 - Vite 4→5, tsconfig es5→es2016, App.tsx → 5 hooks
@@ -54,6 +55,7 @@
 **Requirements:** AUTOPILOT-01 through AUTOPILOT-07
 
 **Results:**
+
 - 18 new backend tests (209→227), 1 new frontend test (87→88)
 - 3 new `[[action:...]]` directives in `DEFAULT_CHAT_TEMPLATE`
 - `Ctrl+Shift+L` shortcut, `AutoSuggestBanner`, `addTriplet(term, category, polarity)` wrapper
@@ -79,6 +81,7 @@
 **Requirements:** NEWUI-11 through NEWUI-16
 
 **Results:**
+
 - 9 new backend tests (227→237), 0 new frontend tests needed
 - CSV column names on grid card headers; Demo mode toggle (6-sample data, all 3 tiers)
 - Tier filter dropdown (All/Tier 1/2/3) filtering review queue
@@ -104,6 +107,7 @@
 **Requirements:** AL-01 through AL-09
 
 **Results:**
+
 - 12 new backend tests (224→236), 0 new frontend tests needed (existing 94 still pass)
 - `predict_texts()` service function for batch prediction with confidence threshold filtering
 - `POST /learning/autopilot` endpoint for batch auto-annotation of unlabeled reviews
@@ -123,7 +127,11 @@
 
 **Requirements:** UX-01 through UX-03
 
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
+
+- [x] 07.6-01-PLAN.md
+- [ ] 07.6-02-PLAN.md
+- [ ] 07.6-03-PLAN.md
 
 | Plan | Description | Est. effort |
 |---|---|---|

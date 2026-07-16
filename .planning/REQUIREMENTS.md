@@ -50,6 +50,12 @@
 - [x] **AUTOPILOT-06**: `GET /chat/predictions/{data_idx}` endpoint in `app/routes/chat_predictions.py` — returns Turkish chat text + raw predictions array. 18 tests covering 200, 404, 400, determinism.
 - [x] **AUTOPILOT-07**: `annotateAll(count?)` pipeline action in `AppActions` — predict → filter >0.5 → addTriplet → saveAndNext → loop with abort safety, progress toasts, and N-review limit (default 5).
 
+### UX — 4-Way Diff Readability (Phase 7.6)
+
+- [x] **UX-01**: Move the right-hand resolution panel's LLM diff and majority label content under the LLM-suggested labels in the 4-way compare menu.
+- [ ] **UX-02**: Increase the visual size and spacing of the diff content so reported differences are readable without breaking the existing responsive 4-way layout.
+- [ ] **UX-03**: Preserve accessibility and project UI constraints: no overlap with NLP toolbar/chat, touch targets stay ≥44×44px, reduced-motion behavior is respected, and modified source files contain no emoji.
+
 ## v2 Requirements
 
 Deferred to future phases. Tracked but not in current roadmap.
@@ -80,13 +86,15 @@ Deferred to future phases. Tracked but not in current roadmap.
 | TEST-01 through TEST-04 | Phase 7.2 | ✅ Complete |
 | TSFIX-01 through TSFIX-03 | Phase 7.2 | ✅ Complete |
 | AUTOPILOT-01 through AUTOPILOT-07 | Phase 7.3 | ✅ Complete |
+| UX-01 through UX-03 | Phase 7.6 | Planned |
 
 **Coverage:**
-- v1 requirements: 10 (NEWUI) + 6 (NEWUI-POLISH) + 4 (TEST) + 3 (TSFIX) + 7 (AUTOPILOT) = 30 total
-- Complete: 30/30 ✅ — **Phase 7 fully complete!**
-- Mapped to phases: 30
+
+- v1 requirements: 10 (NEWUI) + 6 (NEWUI-POLISH) + 4 (TEST) + 3 (TSFIX) + 7 (AUTOPILOT) + 3 (UX) = 33 total
+- Complete: 30/33
+- Mapped to phases: 33
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-07-13*
-*Last updated: 2026-07-14 — Phase 7 fully complete (all 30 requirements done)*
+*Last updated: 2026-07-16 — Phase 7.6 UX readability requirements added*
