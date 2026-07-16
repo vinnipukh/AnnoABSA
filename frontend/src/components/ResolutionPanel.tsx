@@ -114,36 +114,30 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
       bg: 'bg-success/5',
       header: 'bg-success/10 border-success/30',
       icon: <CheckCircleIcon />,
-      title: 'Auto-Accept',
-      text: 'GT triplets match majority consensus',
-      suggestion: 'GT triplets pre-selected — save to accept',
+      title: 'Otomatik Kabul',
+      text: 'GT üçlüleri çoğunluk uzlaşmasıyla eşleşiyor',
+      suggestion: 'GT üçlüleri önceden seçildi — kabul etmek için kaydedin',
       suggestionClass: 'text-success',
-      badgeText: 'Tüm modeller uyumlu',
-      badgeClass: 'bg-success/10 text-success border-success/30',
     },
     2: {
       border: 'border-warning/30',
       bg: 'bg-warning/5',
       header: 'bg-warning/10 border-warning/30',
       icon: <WarningCircleIcon />,
-      title: 'Quick Diff',
-      text: 'Consensus found but differs from GT — verify',
-      suggestion: 'Majority differs from GT — review diff below',
+      title: 'Hızlı Fark',
+      text: 'Uzlaşma bulundu ancak GT\'den farklı — doğrulayın',
+      suggestion: 'Çoğunluk GT\'den farklı — aşağıdaki farkı inceleyin',
       suggestionClass: 'text-warning',
-      badgeText: 'Görüş ayrılığı var',
-      badgeClass: 'bg-warning/10 text-warning border-warning/30',
     },
     3: {
       border: 'border-error/30',
       bg: 'bg-error/5',
       header: 'bg-error/10 border-error/30',
       icon: <XCircleIcon />,
-      title: 'Manual Review',
-      text: 'No consensus — manual review required',
-      suggestion: 'Review all 4 models in grid, select correct triplets',
+      title: 'Manuel İnceleme',
+      text: 'Uzlaşma yok — manuel inceleme gerekli',
+      suggestion: '4 modelin tamamını ızgarada inceleyin, doğru üçlüleri seçin',
       suggestionClass: 'text-error',
-      badgeText: 'Uzlaşma yok',
-      badgeClass: 'bg-error/10 text-error border-error/30',
     },
   };
 
@@ -187,59 +181,74 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
         </div>
       </div>
 
-      {/* ── Primary Suggestion Box ── */}
+      {/* ── Birincil Öneri Kutusu ── */}
       <div className="bg-base-200/80 border border-base-300/80 rounded-xl p-3 mb-2">
         <div className="text-[10px] font-bold text-base-content/60 uppercase tracking-wider mb-1">
-          Primary Suggestion
-        </div>
-        <div className={`text-xs font-medium ${tc.suggestionClass} flex items-start gap-1.5`}>
-          {tier === 1 && <CheckCircleIcon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />}
-          {tier === 2 && <WarningCircleIcon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />}
-          {tier === 3 && <XCircleIcon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />}
-          <span>{tc.suggestion}</span>
-        </div>
-      </div>
-
-      {/* ── Diff Tracker Box ── */}
-      <div className="bg-base-200/80 border border-base-300/80 rounded-xl p-3 mb-2 flex-1 overflow-y-auto min-h-0 resolution-panel-card">
-        <div className="text-[10px] font-bold text-base-content/60 uppercase tracking-wider mb-1.5">
-          Diff Tracker
+          Birincil Öneri
         </div>
 
-        {/* Tier 1: green badge + majority label list */}
-        {tier === 1 && (
-          <div className="text-xs text-success space-y-1.5">
-            <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded border ${tc.badgeClass}`}>
-              {tc.badgeText}
-            </span>
-            {majorityLabel.map(t => (
-              <div key={t.id} className="flex items-center gap-1.5 text-[11px] text-base-content">
-                <DiamondIcon className="w-2.5 h-2.5 text-success flex-shrink-0" />
-                <span className="truncate">&quot;{t.aspect_term || 'NULL'}&quot;</span>
-                <span className={`text-[10px] px-1 py-0.5 rounded uppercase font-mono border flex-shrink-0 ${getSentimentBadge(t.sentiment_polarity)}`}>
-                  {t.sentiment_polarity}
-                </span>
-              </div>
-            ))}
-            {majorityLabel.length === 0 && (
-              <p className="text-[10px] text-base-content/40 italic">No consensus triplets</p>
-            )}
+        {/* Tier 1 & 2: LLM-suggested labels (majority triplets) shown prominently */}
+        {(tier === 1 || tier === 2) && (
+          <div className="space-y-1.5">
+            <div className="space-y-1">
+              {majorityLabel.map(t => (
+                <div key={t.id} className="flex items-center gap-1.5 text-[11px] text-base-content">
+                  <DiamondIcon className={`w-2.5 h-2.5 flex-shrink-0 ${tier === 1 ? 'text-success' : 'text-warning'}`} />
+                  <span className="truncate">&quot;{t.aspect_term || 'NULL'}&quot;</span>
+                  <span className={`text-[10px] px-1 py-0.5 rounded uppercase font-mono border flex-shrink-0 ${getSentimentBadge(t.sentiment_polarity)}`}>
+                    {t.sentiment_polarity}
+                  </span>
+                </div>
+              ))}
+              {majorityLabel.length === 0 && (
+                <p className="text-[10px] text-base-content/40 italic">Uzlaşma üçlüsü yok</p>
+              )}
+            </div>
+            <div className={`text-[10px] font-medium ${tc.suggestionClass} flex items-start gap-1.5`}>
+              {tier === 1
+                ? <CheckCircleIcon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                : <WarningCircleIcon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />}
+              <span>{tc.suggestion}</span>
+            </div>
           </div>
         )}
 
-        {/* Tier 2: diff text + side-by-side comparison */}
+        {/* Tier 3: no consensus triplet exists */}
+        {tier === 3 && (
+          <div className="space-y-1.5">
+            <div className="text-xs font-medium text-error flex items-start gap-1.5">
+              <XCircleIcon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+              <span>Uzlaşma sağlanamadı — tüm modelleri inceleyin</span>
+            </div>
+            <div className={`text-[10px] font-medium ${tc.suggestionClass}`}>
+              {tc.suggestion}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Fark Takibi Kutusu ── */}
+      <div className="bg-base-200/80 border border-base-300/80 rounded-xl p-3 mb-2 flex-1 overflow-y-auto min-h-0 resolution-panel-card">
+        <div className="text-[10px] font-bold text-base-content/60 uppercase tracking-wider mb-1.5">
+          Fark Takibi
+        </div>
+
+        {/* Tier 1: compact GT match confirmation (labels now live in Birincil Öneri) */}
+        {tier === 1 && (
+          <div className="flex items-center gap-1.5 border border-success/40 bg-success/5 rounded-lg px-2 py-1.5 text-[11px] text-success font-medium">
+            <CheckCircleIcon className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>GT ile eşleşiyor</span>
+          </div>
+        )}
+
+        {/* Tier 2: side-by-side comparison first, diff text below */}
         {tier === 2 && (
           <div className="text-xs space-y-2">
-            {originalLlmDiff && (
-              <div className="text-[10px] bg-base-300/50 p-2 rounded border border-base-300 font-mono text-base-content/70 leading-relaxed max-h-[60px] overflow-y-auto">
-                {originalLlmDiff}
-              </div>
-            )}
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <div className="text-[9px] text-warning font-bold uppercase mb-0.5 flex items-center gap-1">
                   <WarningCircleIcon className="w-2.5 h-2.5" />
-                  Majority
+                  Çoğunluk
                 </div>
                 {majorityLabel.map(t => (
                   <div key={t.id} className="text-[10px] text-base-content/80 truncate flex items-center gap-1">
@@ -254,7 +263,7 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
               <div>
                 <div className="text-[9px] text-primary font-bold uppercase mb-0.5 flex items-center gap-1">
                   <ShieldIcon className="w-2.5 h-2.5" />
-                  GT (Original)
+                  GT (Orijinal)
                 </div>
                 {gtTriplets.map(t => (
                   <div key={t.id} className="text-[10px] text-base-content/80 truncate flex items-center gap-1">
@@ -267,6 +276,13 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
                 )}
               </div>
             </div>
+            {originalLlmDiff && (
+              <div className="pt-2 border-t border-base-300">
+                <div className="text-[10px] bg-base-300/50 p-2 rounded border border-base-300 font-mono text-base-content/70 leading-relaxed max-h-[60px] overflow-y-auto">
+                  {originalLlmDiff}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -287,7 +303,7 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
               className="resolution-panel-btn w-full min-h-[44px] px-3 bg-success hover:bg-success/90 text-success-content font-bold rounded-lg text-xs transition-all shadow-sm flex items-center justify-center gap-2 select-none"
             >
               <CheckCircleIcon className="w-4 h-4" />
-              Kabul Et (Auto-Accept)
+              Kabul Et (Otomatik Kabul)
             </button>
             <button
               onClick={() => setShowManualForm(!showManualForm)}
@@ -306,7 +322,7 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
               className="resolution-panel-btn w-full min-h-[44px] px-3 bg-warning hover:bg-warning/90 text-warning-content font-bold rounded-lg text-xs transition-all shadow-sm flex items-center justify-center gap-2 select-none"
             >
               <WarningCircleIcon className="w-4 h-4" />
-              Majority Kabul Et
+              Çoğunluğu Kabul Et
             </button>
             <button
               onClick={() => onAcceptSuggestion(gtTriplets)}
@@ -338,7 +354,7 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
             ) : (
               <>
                 <ClipboardIcon className="w-4 h-4" />
-                Manuel Giris
+                Manuel Giriş
               </>
             )}
           </button>
@@ -351,12 +367,12 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
           <form onSubmit={handleManualSubmit} className="space-y-2 bg-base-300/50 p-2.5 rounded-xl border border-base-300/80">
             {/* Aspect term input */}
             <div>
-              <label className="text-[10px] text-base-content/50 font-mono mb-0.5 block">ASPECT TERM:</label>
+              <label className="text-[10px] text-base-content/50 font-mono mb-0.5 block">ASPECT TERİMİ:</label>
               <input
                 type="text"
                 value={aspectTerm}
                 onChange={e => setAspectTerm(e.target.value)}
-                placeholder="Aspect term (bos = NULL)"
+                placeholder="Aspect terimi (boş = NULL)"
                 className="w-full bg-base-200 border border-base-300 rounded-lg px-2.5 py-1.5 text-xs text-base-content placeholder-base-content/40 focus:outline-none focus:border-primary"
               />
             </div>
@@ -364,7 +380,7 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
             {/* Category dropdown + sentiment buttons */}
             <div className="grid grid-cols-2 gap-1.5">
               <div>
-                <label className="text-[10px] text-base-content/50 font-mono mb-0.5 block">KATEGORI:</label>
+                <label className="text-[10px] text-base-content/50 font-mono mb-0.5 block">KATEGORİ:</label>
                 <select
                   value={category}
                   onChange={e => setCategory(e.target.value)}
@@ -403,7 +419,7 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
               type="submit"
               className="resolution-panel-btn w-full min-h-[36px] bg-primary hover:bg-primary/90 text-primary-content font-bold rounded-lg text-[10px] transition-all shadow-sm flex items-center justify-center gap-1.5 select-none"
             >
-              + Triplet Ekle
+              + Üçlü Ekle
             </button>
           </form>
 
@@ -426,7 +442,7 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
                   <button
                     onClick={() => onRemoveTriplet(t.id)}
                     className="p-1 text-base-content/40 hover:text-error transition-colors flex-shrink-0"
-                    title="Remove triplet"
+                    title="Üçlüyü kaldır"
                   >
                     <CloseIcon className="w-3 h-3" />
                   </button>
