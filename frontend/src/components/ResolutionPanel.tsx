@@ -169,7 +169,7 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
   `;
 
   return (
-    <div className={`w-[280px] flex-shrink-0 flex flex-col h-full rounded-2xl border ${tc.border} ${tc.bg} p-3 shadow-xl backdrop-blur-sm overflow-hidden`}>
+    <div className={`w-[300px] flex-shrink-0 flex flex-col h-full rounded-2xl border ${tc.border} ${tc.bg} p-3 shadow-xl backdrop-blur-sm overflow-hidden`}>
       <style>{motionStyles}</style>
 
       {/* ── Tier Header ── */}
@@ -201,7 +201,7 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
                 </div>
               ))}
               {majorityLabel.length === 0 && (
-                <p className="text-[10px] text-base-content/40 italic">Uzlaşma üçlüsü yok</p>
+                <p className="text-[11px] text-base-content/40 italic">Uzlaşma üçlüsü yok</p>
               )}
             </div>
             <div className={`text-[10px] font-medium ${tc.suggestionClass} flex items-start gap-1.5`}>
@@ -229,7 +229,7 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
 
       {/* ── Fark Takibi Kutusu ── */}
       <div className="bg-base-200/80 border border-base-300/80 rounded-xl p-3 mb-2 flex-1 overflow-y-auto min-h-0 resolution-panel-card">
-        <div className="text-[10px] font-bold text-base-content/60 uppercase tracking-wider mb-1.5">
+        <div className="text-[11px] font-bold text-base-content/60 uppercase tracking-wider mb-1.5">
           Fark Takibi
         </div>
 
@@ -246,39 +246,39 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
           <div className="text-xs space-y-2">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <div className="text-[9px] text-warning font-bold uppercase mb-0.5 flex items-center gap-1">
+                <div className="text-[10px] text-warning font-bold uppercase mb-0.5 flex items-center gap-1">
                   <WarningCircleIcon className="w-2.5 h-2.5" />
                   Çoğunluk
                 </div>
                 {majorityLabel.map(t => (
-                  <div key={t.id} className="text-[10px] text-base-content/80 truncate flex items-center gap-1">
+                  <div key={t.id} className="text-[11px] text-base-content/80 truncate flex items-center gap-1">
                     <DiamondIcon className="w-2 h-2 text-warning flex-shrink-0" />
                     &quot;{t.aspect_term}&quot;
                   </div>
                 ))}
                 {majorityLabel.length === 0 && (
-                  <p className="text-[10px] text-base-content/40 italic">—</p>
+                  <p className="text-[11px] text-base-content/40 italic">—</p>
                 )}
               </div>
               <div>
-                <div className="text-[9px] text-primary font-bold uppercase mb-0.5 flex items-center gap-1">
+                <div className="text-[10px] text-primary font-bold uppercase mb-0.5 flex items-center gap-1">
                   <ShieldIcon className="w-2.5 h-2.5" />
                   GT (Orijinal)
                 </div>
                 {gtTriplets.map(t => (
-                  <div key={t.id} className="text-[10px] text-base-content/80 truncate flex items-center gap-1">
+                  <div key={t.id} className="text-[11px] text-base-content/80 truncate flex items-center gap-1">
                     <DiamondIcon className="w-2 h-2 text-primary flex-shrink-0" />
                     &quot;{t.aspect_term}&quot;
                   </div>
                 ))}
                 {gtTriplets.length === 0 && (
-                  <p className="text-[10px] text-base-content/40 italic">—</p>
+                  <p className="text-[11px] text-base-content/40 italic">—</p>
                 )}
               </div>
             </div>
             {originalLlmDiff && (
               <div className="pt-2 border-t border-base-300">
-                <div className="text-[10px] bg-base-300/50 p-2 rounded border border-base-300 font-mono text-base-content/70 leading-relaxed max-h-[60px] overflow-y-auto">
+                <div className="text-[11px] bg-base-300/50 p-2.5 rounded border border-base-300 font-mono text-base-content/70 leading-relaxed max-h-[120px] overflow-y-auto">
                   {originalLlmDiff}
                 </div>
               </div>
@@ -288,7 +288,7 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
 
         {/* Tier 3: message about all 4 models */}
         {tier === 3 && (
-          <div className="text-[11px] text-base-content/60 leading-relaxed">
+          <div className="text-xs text-base-content/60 leading-relaxed">
             Tüm 4 model çıktısı yukarıdaki ızgarada görünüyor. Lütfen doğru tripletleri seçin.
           </div>
         )}
