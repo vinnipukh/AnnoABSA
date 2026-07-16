@@ -1,3 +1,17 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: unknown
+last_updated: "2026-07-16T14:38:09.762Z"
+progress:
+  total_phases: 1
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
+---
+
 # STATE.md — AnnoABSA Project State
 
 **Last updated:** 2026-07-16
@@ -16,6 +30,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-13)
 Phase 7.5 — Active Learning, Filtering & Autopilot Rework
 
 **Last Completed:** Arrow key navigation (← →) with settings toggle
+
   - `arrow_key_navigation` added to Settings interface + useSettings + SettingsPanel toggle
   - `useEffect` keyboard listener in App.tsx: Left/Right arrows → prev/next review
   - Guards against triggering while typing in INPUT/TEXTAREA/SELECT
@@ -26,12 +41,14 @@ Phase 7.5 — Active Learning, Filtering & Autopilot Rework
 ## Phase Completion Summary
 
 **Phase 7.1 — Compare Mode UI Rework (13 Jul 2026)**
+
 - 5/5 plans executed
 - 128 backend + 64 frontend tests passing
 - `FourWayGrid.tsx`, `ResolutionPanel.tsx`, `CompactTripletChip.tsx`, `ReviewHeader.tsx` new
 - 4-way CSV parser (`_detect_newui_columns`, `_load_4way_row`)
 
 **Phase 7.2 — Testing & TypeScript Fixes (14 Jul 2026)**
+
 - 5/5 plans executed
 - 81 new backend tests (128→209), 23 new frontend tests (64→87) = 296 total
 - 3 pre-existing TS errors resolved (0 remaining)
@@ -40,6 +57,7 @@ Phase 7.5 — Active Learning, Filtering & Autopilot Rework
 - Bug fix: `app/routes/timing.py` — HTTPException no longer swallowed by generic except
 
 **Phase 7.3 — Autonomous Annotation Pipeline (14 Jul 2026)**
+
 - 6/6 plans executed
 - 18 new backend tests (209→227), 1 new frontend test (87→88) = 315 total
 - 0 new TS errors, clean build
@@ -55,12 +73,14 @@ Phase 7.5 — Active Learning, Filtering & Autopilot Rework
 ## Phase Completion Summary
 
 **Phase 7.1 — Compare Mode UI Rework (13 Jul 2026)**
+
 - 5/5 plans executed
 - 128 backend + 64 frontend tests passing
 - `FourWayGrid.tsx`, `ResolutionPanel.tsx`, `CompactTripletChip.tsx`, `ReviewHeader.tsx` new
 - 4-way CSV parser (`_detect_newui_columns`, `_load_4way_row`)
 
 **Phase 7.2 — Testing & TypeScript Fixes (14 Jul 2026)**
+
 - 5/5 plans executed
 - 81 new backend tests (128→209), 23 new frontend tests (64→87) = 296 total
 - 3 pre-existing TS errors resolved (0 remaining)
@@ -109,33 +129,39 @@ See: `.planning/codebase/` (7 documents, 2,109 lines)
 ## Phase 7.5 Deliverables
 
 ### Backend
+
 - **`predict_texts()`** in `services/active_learning.py` — batch prediction for multiple texts with confidence threshold filtering, returns sorted predictions
 - **`AutopilotRequest`** schema in `models/schemas.py` — `count`, `confidence_threshold`, `start_index` parameters
 - **`POST /learning/autopilot`** endpoint — trains on labeled data, batch-predicts for unlabeled reviews, saves annotations, returns annotated count + remaining count
 
 ### Frontend
+
 - **"Otomatik Etiketle" button** in toolbar — calls batch autopilot endpoint, shows loading spinner + "Etiketleniyor..." during execution
 - Success toast: `"{N} inceleme etiketlendi ({M} kaldi)"`
 - Error handling: backend offline → error toast, no crash
 - Arrow key navigation (← →) with settings toggle (completed earlier)
 
 ### Tests
+
 | File | Tests | What it covers |
 |------|-------|----------------|
 | `tests/test_active_learning.py` | 5 new | `predict_texts` — batch prediction, empty input, confidence filtering, None model data, sorted output |
 | `tests/test_learning_routes.py` | 7 new | `POST /learning/autopilot` — happy path, <2 labeled → 400, single labeled → 400, all labeled → annotated=0, count limit, start_index, valid JSON saving |
 
 ### Test Results
+
 - Backend: 236 passed (+12 over Phase 7.4)
 - Frontend: 94 passed (+6 over Phase 7.3)
 
 ### Phase 7.5 Summary
+
 - **Plan 1:** Backend autopilot endpoint (`predict_texts` + `POST /learning/autopilot`) ✅
 - **Plan 2:** Frontend batch autopilot button ("Otomatik Etiketle") ✅
 - **Plan 3:** Integration tests (12 new backend tests + existing frontend autopilot tests) ✅
 - **Plan 4:** 4-way default mode, Tier 1 removed from filter, null-safety, comprehensive tests ✅
 
 ### Frontend
+
 - **FourWayGrid.tsx**: CSV column names displayed as subtle monospace labels on grid card headers
 - **demoData.ts**: 6-sample demo data covering all 3 tiers (Tier 1/2: 2 each, Tier 3: 2)
 - **Demo toggle**: 4th mode button — loads FALLBACK_DATA-style demo reviews instead of backend
@@ -145,15 +171,18 @@ See: `.planning/codebase/` (7 documents, 2,109 lines)
 - **Export button**: "Dışa Aktar" download button in toolbar
 
 ### Backend
+
 - **`GET /data/export-4way`**: New endpoint returning CSV with all original columns + `selected_triplets`, `resolution_tier`, `annotator_notes`
 - **`tests/test_export.py`**: 9 tests covering CSV format, headers, row count, column presence
 
 ### Emoji Remediation
+
 - App.tsx: Removed ◀/▶ from prev/next buttons, all ✅/❌ from toast messages (0 emoji)
 - FourWayGrid.tsx: 0 emoji (already clean)
 - ResolutionPanel.tsx: 0 emoji (already used Heroicons)
 
 ## Final Phase 7 Totals
+
 - Backend tests: 128 → 237 (+109 over Phase 7)
 - Frontend tests: 64 → 88 (+24 over Phase 7)
 - TypeScript errors: 3 → 0
@@ -192,12 +221,14 @@ See: `.planning/codebase/` (7 documents, 2,109 lines)
 ## Phase 7.1 Deliverables
 
 ### New Components
+
 - `CompactTripletChip.tsx` — Single-line triplet chip for 2x2 grid columns
 - `ReviewHeader.tsx` — Standalone review text display with NLP toolbar support
 - `FourWayGrid.tsx` — 2x2 grid with consensus diamond (color-coded by majority_vote)
 - `ResolutionPanel.tsx` — 3-tier curation panel (Auto-Accept/Quick Diff/Manual)
 
 ### Backend
+
 - `NEWUI_COLUMNS` — Column name mapping for 4-way CSV
 - `_detect_newui_columns()` — Auto-detect NEWUI columns in DataFrame
 - `_load_4way_row()` — Parse single NEWUI CSV row into 8 response fields
@@ -207,6 +238,7 @@ See: `.planning/codebase/` (7 documents, 2,109 lines)
 ## Phase 7.2 Deliverables
 
 ### New Test Files
+
 | File | Tests | Target |
 |---|---|---|
 | `tests/test_active_learning.py` | 18 | `services/active_learning.py` |
@@ -216,6 +248,7 @@ See: `.planning/codebase/` (7 documents, 2,109 lines)
 | `tests/test_routes_misc.py` | 16 | Settings, timing, upload routes |
 
 ### Frontend Refactoring
+
 - `App.tsx` 770→250 lines, 5 custom hooks extracted
 - `frontend/src/hooks/useReviewNavigation.ts` — Index/data/save management
 - `frontend/src/hooks/useAnnotationState.ts` — Triplet selection state
@@ -224,14 +257,17 @@ See: `.planning/codebase/` (7 documents, 2,109 lines)
 - `frontend/src/hooks/useCompareMode.ts` — Mode toggle state
 
 ### Infrastructure
+
 - Vite 4→5 (`^5.4.19`), `@vitejs/plugin-react` `^4.4.1`
 - tsconfig: `target: "es5"` → `"es2016"`, `lib: ["es2016"]`
 - 3 TypeScript errors resolved (TSFIX-01, TSFIX-02, TSFIX-03)
 
 ### Bug Fix
+
 - `app/routes/timing.py`: `HTTPException(404)` for out-of-range index was caught by generic `except Exception` and returned as 500. Restructured try/except to pass intentional HTTPExceptions through.
 
 ### Test Results
+
 - Backend: 209 passed, 0 failed (was 128)
 - Frontend: 87 passed, 0 failed (was 64)
 - TypeScript: 0 errors (was 3)
@@ -252,3 +288,9 @@ See: `.planning/codebase/` (7 documents, 2,109 lines)
 ---
 
 *STATE.md last updated: 2026-07-14 — Phase 7.5 started (arrow key navigation + toggle)*
+
+## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 7.6 added: 4-way diff readability: move LLM diff and majority label under LLM-suggested labels; enlarge diffs for readability

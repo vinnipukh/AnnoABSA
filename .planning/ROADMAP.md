@@ -115,6 +115,26 @@
 
 ---
 
+## Phase 7.6: 4-Way Diff Readability
+
+**Goal:** Improve the 4-way compare resolution layout by moving the right-hand LLM diff and majority label content under the LLM-suggested labels, and increasing diff display size so users can read reported differences more easily.
+
+**Depends on:** Phase 7.5
+
+**Requirements:** UX-01 through UX-03
+
+**Plans:** 3 plans
+
+| Plan | Description | Est. effort |
+|---|---|---|
+| 1 | Frontend: reposition majority label and LLM diff content beneath LLM-suggested labels in the 4-way resolution area | Medium |
+| 2 | Frontend: enlarge diff display typography/spacing while preserving responsive layout and no-toolbar-overlap constraints | Medium |
+| 3 | Tests and accessibility: update component tests and verify readable diff layout, touch targets, reduced-motion behavior, and no emoji regressions | Medium |
+
+**Wave execution:** Sequential (layout move first, readability sizing second, tests last)
+
+---
+
 ## Milestone Completion Criteria
 
 - [x] NEWUI: 4-way Compare mode renders correctly with all 3 curation tiers functional
@@ -122,6 +142,7 @@
 - [x] TSFIX: 0 pre-existing TS errors
 - [x] AUTOPILOT: Helper Agent can fully annotate a review autonomously (predict → select → save → next)
 - [x] NEWUI-POLISH: Demo mode, tier filter, auto-save, save button, CSV export
+- [ ] UX: 4-way diff and majority label readability improvements
 - [x] All 237 backend tests still pass
 - [x] All 88 frontend tests still pass
 - [x] 0 emoji in any modified source file
@@ -137,4 +158,4 @@
 | Phase 10 | Multi-user / lightweight auth for shared deployment | Architecture review |
 
 ---
-*ROADMAP last updated: 2026-07-14 after Phase 7.4 completion (Phase 7 fully done)*
+*ROADMAP last updated: 2026-07-16 after Phase 7.6 readability phase was added*
