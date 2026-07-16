@@ -14,3 +14,10 @@ class AgentChatRequest(BaseModel):
     model_b_triplets: list = []
     user_message: str
     chat_history: list = []
+
+
+class AutopilotRequest(BaseModel):
+    """Request model for POST /learning/autopilot — batch auto-annotation."""
+    count: int = 10
+    confidence_threshold: float = 0.5
+    start_index: int | None = None

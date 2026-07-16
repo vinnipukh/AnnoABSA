@@ -368,6 +368,41 @@ export default function App() {
     }
   }, [backendUrl, currentIndex, autopilotLoading, currentData, toggleTriplet]);
 
+  // ── Batch Autopilot (Plan 7.5) ──
+
+  const handleRunAutopilot = useCallback(async () => {
+    if (autopilotLoading) return;
+    setAutopilotLoading(true);
+    const count = 10;
+    try {
+      const res = await fetch(`${backendUrl}/learning/autopilot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ count, confidence_threshold: 0.5 }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: '' }));
+        setSaveToast(err.detail || 'Otomatik etiketleme basarisiz');
+        setTimeout(() => setSaveToast(null), 3000);
+        return;
+      }
+      const data = await res.json();
+      if (data.annotated > 0) {
+        setSaveToast(`${data.annotated} inceleme etiketlendi (${data.total_unlabeled} kaldi)`);
+        // Reload current review data
+        loadReviewRow(currentIndex);
+      } else {
+        setSaveToast(data.message || 'Etiketlenecek inceleme bulunamadi');
+      }
+      setTimeout(() => setSaveToast(null), 3500);
+    } catch {
+      setSaveToast('Otomatik etiketleme basarisiz — sunucuya baglanilamiyor');
+      setTimeout(() => setSaveToast(null), 3000);
+    } finally {
+      setAutopilotLoading(false);
+    }
+  }, [backendUrl, currentIndex, autopilotLoading, loadReviewRow]);
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -509,8 +544,8 @@ export default function App() {
     clearAll: () => { setManualTriplets([]); clearAll(); },
     openSettings: () => setShowSettings(true),
     annotateAll: handlePredictReview,
-    runAutopilot: handlePredictReview,
-  }), [goToNext, goToPrev, toggleMode, toggleTriplet, selectAllInColumn, clearAllInColumn, handleNextReview, handlePrevReview, fetchAIPrediction, fetchLivePrediction, currentIndex, clearAll, handlePredictReview, currentData.model_a_triplets, currentData.model_b_triplets, currentData.gt_triplets, currentData.gemma_triplets, currentData.qwen_triplets, currentData.gpt_triplets]);
+    runAutopilot: handleRunAutopilot,
+  }), [goToNext, goToPrev, toggleMode, toggleTriplet, selectAllInColumn, clearAllInColumn, handleNextReview, handlePrevReview, fetchAIPrediction, fetchLivePrediction, currentIndex, clearAll, handlePredictReview, handleRunAutopilot, currentData.model_a_triplets, currentData.model_b_triplets, currentData.gt_triplets, currentData.gemma_triplets, currentData.qwen_triplets, currentData.gpt_triplets]);
 
   const tripletCount = mode === 'compare'
     ? (selectedIds.model_a?.size || 0) + (selectedIds.model_b?.size || 0) + (selectedIds.gt?.size || 0) + (selectedIds.gemma?.size || 0) + (selectedIds.qwen?.size || 0) + (selectedIds.gpt?.size || 0) + manualTriplets.length
@@ -636,6 +671,30 @@ export default function App() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
                 Tahmin Et
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => handleRunAutopilot()}
+            disabled={autopilotLoading}
+            className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all select-none flex items-center gap-1 ${
+              autopilotLoading
+                ? 'opacity-50 cursor-not-allowed bg-base-200 text-success'
+                : 'bg-base-200 text-base-content/70 hover:text-success hover:border-success/40 border border-base-300'
+            }`}
+            title="Etiketlenmemis tum incelemeleri ML ile otomatik etiketle"
+          >
+            {autopilotLoading ? (
+              <>
+                <div className="w-3 h-3 border-2 border-success border-t-transparent rounded-full animate-spin" />
+                Etiketleniyor...
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Otomatik Etiketle
               </>
             )}
           </button>

@@ -11,6 +11,7 @@ import pytest
 from services.active_learning import (
     labeled_texts_from_data,
     train_labeled_data,
+    predict_texts,
 )
 
 
@@ -198,5 +199,75 @@ class TestTrainLabeledData:
         )
         assert np.all((proba >= 0) & (proba <= 1))
 
+
+# ---------------------------------------------------------------------------
+# predict_texts
+# ---------------------------------------------------------------------------
+
+
+class TestPredictTexts:
+    """Tests for predict_texts — batch prediction + confidence filtering."""
+
+    def test_predicts_for_multiple_texts(self):
+        texts = ["yemek güzel", "servis kötü"]
+        labels = [
+            ["Food#quality__positive"],
+            ["Service#general__negative"],
+        ]
+        model_data = train_labeled_data(texts, labels)
+        assert model_data is not None
+
+        results = predict_texts(model_data, texts)
+        assert len(results) == 2
+        # Each result should have predictions (at least above threshold)
+        for preds in results:
+            assert isinstance(preds, list)
+            for p in preds:
+                assert "aspect_category" in p
+                assert "sentiment_polarity" in p
+                assert "confidence" in p
+                assert "label" in p
+
+    def test_empty_texts_returns_empty_lists(self):
+        texts = ["yemek güzel", "servis kötü"]
+        labels = [["Food#quality__positive"], ["Service#general__negative"]]
+        model_data = train_labeled_data(texts, labels)
+        assert model_data is not None
+
+        results = predict_texts(model_data, [])
+        assert results == []
+
+    def test_confidence_threshold_filters_low_confidence(self):
+        texts = ["yemek güzel", "servis kötü"]
+        labels = [["Food#quality__positive"], ["Service#general__negative"]]
+        model_data = train_labeled_data(texts, labels)
+        assert model_data is not None
+
+        # With threshold 1.0, nothing should pass
+        results = predict_texts(model_data, texts, confidence_threshold=1.0)
+        assert len(results) == 2
+        for preds in results:
+            assert len(preds) == 0
+
+    def test_none_model_data_returns_empty(self):
+        results = predict_texts(None, ["some text"])
+        assert results == [[]]
+
+    def test_predictions_sorted_by_confidence(self):
+        texts = [
+            "great food and wonderful service and amazing ambiance",
+            "bad food terrible service",
+        ]
+        labels = [
+            ["Food#quality__positive", "Service#general__positive"],
+            ["Food#quality__negative", "Service#general__negative"],
+        ]
+        model_data = train_labeled_data(texts, labels)
+        assert model_data is not None
+
+        results = predict_texts(model_data, texts, confidence_threshold=0.0)
+        for preds in results:
+            confidences = [p["confidence"] for p in preds]
+            assert confidences == sorted(confidences, reverse=True)
 
 

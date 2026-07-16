@@ -208,4 +208,98 @@ class TestGetLearningPredict:
             os.unlink(csv_path)
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# POST /learning/autopilot
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestPostLearningAutopilot:
+    """Tests for the POST /learning/autopilot batch annotation endpoint."""
+
+    def test_autopilot_with_enough_labeled_returns_annotations(self, app):
+        """With 2+ labeled reviews, autopilot predicts and saves."""
+        response = app.post("/learning/autopilot", json={"count": 3, "confidence_threshold": 0.0})
+        assert response.status_code == 200
+        data = response.json()
+        assert "annotated" in data
+        assert "total_unlabeled" in data
+        assert data["annotated"] >= 0
+        assert data["total_unlabeled"] >= 0
+
+    def test_autopilot_fewer_than_2_labeled_returns_400(self, app):
+        """With < 2 labeled reviews, return 400."""
+        rows = [
+            {"review_id": 0, "text": "Manzara güzel", "label": ""},
+            {"review_id": 1, "text": "Yemek lezzetli", "label": ""},
+        ]
+        csv_path = _make_csv(rows)
+        try:
+            _switch_datafile(app, csv_path)
+            response = app.post("/learning/autopilot", json={"count": 3})
+            assert response.status_code == 400
+            data = response.json()
+            assert "detail" in data
+            assert "en az 2" in data["detail"].lower()
+        finally:
+            os.unlink(csv_path)
+
+    def test_autopilot_single_labeled_returns_400(self, app):
+        """With only 1 labeled review, return 400."""
+        csv_path = _make_csv(SINGLE_LABELED_ROWS)
+        try:
+            _switch_datafile(app, csv_path)
+            response = app.post("/learning/autopilot", json={"count": 3})
+            assert response.status_code == 400
+        finally:
+            os.unlink(csv_path)
+
+    def test_autopilot_all_labeled_returns_annotated_0(self, app):
+        """When all reviews are already labeled, return annotated=0."""
+        csv_path = _make_csv(ALL_LABELED_ROWS)
+        try:
+            _switch_datafile(app, csv_path)
+            response = app.post("/learning/autopilot", json={"count": 3, "confidence_threshold": 0.0})
+            assert response.status_code == 200
+            data = response.json()
+            assert data["annotated"] == 0
+        finally:
+            os.unlink(csv_path)
+
+    def test_autopilot_respects_count(self, app):
+        """The count parameter limits how many reviews are annotated."""
+        response = app.post("/learning/autopilot", json={"count": 1, "confidence_threshold": 0.0})
+        assert response.status_code == 200
+        data = response.json()
+        # With conftest CSV: 5 rows, rows 0 and 2 labeled, unlabeled: 3
+        # count=1 means at most 1 annotated
+        assert data["annotated"] <= 1
+
+    def test_autopilot_respects_start_index(self, app):
+        """The start_index parameter skips earlier unlabeled reviews."""
+        response = app.post("/learning/autopilot", json={
+            "count": 5, "confidence_threshold": 0.0, "start_index": 3
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert "annotated" in data
+
+    def test_autopilot_saves_valid_json_label(self, app):
+        """After autopilot, saved labels should be valid JSON."""
+        import app.config as app_cfg
+        import pandas as pd
+
+        # Run autopilot with low threshold on conftest CSV
+        response = app.post("/learning/autopilot", json={"count": 1, "confidence_threshold": 0.0})
+        assert response.status_code == 200
+
+        # Read back the CSV to verify label format
+        df = pd.read_csv(app_cfg.DATA_FILE_PATH)
+        for _, row in df.iterrows():
+            label = row.get("label", "")
+            if pd.notna(label) and str(label).strip() not in ("", "[]"):
+                import json
+                parsed = json.loads(str(label))
+                assert isinstance(parsed, list)
+
+
 

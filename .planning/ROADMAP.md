@@ -97,11 +97,21 @@
 
 ---
 
-## Phase 7.5 — Active Learning, Filtering & Autopilot Rework
+## Phase 7.5 — Active Learning, Filtering & Autopilot Rework (✅ COMPLETE)
 
 **Goal:** Fix tier filtering (reference equality bug, NaN handling, slow sequential fetches), stabilize active learning suggestions, and make the autopilot annotation pipeline reliable.
 
 **Requirements:** AL-01 through AL-09
+
+**Results:**
+- 12 new backend tests (224→236), 0 new frontend tests needed (existing 94 still pass)
+- `predict_texts()` service function for batch prediction with confidence threshold filtering
+- `POST /learning/autopilot` endpoint for batch auto-annotation of unlabeled reviews
+- "Otomatik Etiketle" button in toolbar calling batch autopilot endpoint
+- Arrow key navigation (← →) with settings toggle
+- 4-way mode is now the default on fresh start (config.py + useCompareMode)
+- Tier 1 removed from filter dropdown (only All/Tier 2/Tier 3 shown)
+- All modified files: 0 emoji, 0 TS errors
 
 ---
 

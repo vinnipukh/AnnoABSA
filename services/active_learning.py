@@ -168,3 +168,52 @@ def train_labeled_data(texts, labels) -> Optional[dict]:
         model.fit(x_labeled, y_labeled)
 
     return {"model": model, "label_columns": all_labels}
+
+
+def predict_texts(model_data: dict, texts: list[str], confidence_threshold: float = 0.5) -> list[list[dict]]:
+    """Predict triplets for multiple texts using a trained model.
+
+    Parameters
+    ----------
+    model_data : dict
+        Output of ``train_labeled_data`` containing ``model`` and ``label_columns``.
+    texts : list[str]
+        Review texts to predict on.
+    confidence_threshold : float, optional
+        Minimum confidence (probability) to include a prediction (default 0.5).
+
+    Returns
+    -------
+    list[list[dict]]
+        For each input text, a list of predicted triplets as dicts with keys
+        ``aspect_category``, ``sentiment_polarity``, ``confidence``, ``label``.
+        Texts with no predictions above threshold yield an empty list.
+    """
+    if not model_data or not texts:
+        return [[] for _ in texts]
+
+    model = model_data["model"]
+    label_columns = model_data["label_columns"]
+
+    proba = model.predict_proba(texts)
+    # proba shape: (n_texts, n_labels) — each column is P(positive)
+    results = []
+    for row_idx in range(len(texts)):
+        predictions = []
+        for col_idx, col_name in enumerate(label_columns):
+            p_pos = float(proba[row_idx, col_idx])
+            if p_pos >= confidence_threshold:
+                parts = col_name.rsplit("__", 1)
+                category = parts[0] if len(parts) == 2 else col_name
+                polarity = parts[1] if len(parts) == 2 else ""
+                predictions.append({
+                    "aspect_category": category,
+                    "sentiment_polarity": polarity,
+                    "confidence": round(p_pos, 6),
+                    "label": col_name,
+                })
+        # Sort by confidence descending
+        predictions.sort(key=lambda x: x["confidence"], reverse=True)
+        results.append(predictions)
+
+    return results

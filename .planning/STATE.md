@@ -1,6 +1,6 @@
 # STATE.md — AnnoABSA Project State
 
-**Last updated:** 2026-07-13
+**Last updated:** 2026-07-16
 
 ---
 
@@ -83,7 +83,7 @@ Phase 7.5 — Active Learning, Filtering & Autopilot Rework
 | 7.1 (Compare UI Rework) | ✓ | 5/5 | 100% |
 | **7.2 (Testing & TS Fixes)** | **✓** | **5/5** | **100%** |
 | **7.3 (Autonomous Pipeline)** | **✓** | **6/6** | **100%** |
-| **7.5 (Active Learning Autopilot)** | **I** | **3/3 plans** | **90%** |
+| **7.5 (Active Learning Autopilot)** | **✓** | **4/4 plans** | **100%** |
 
 ---
 
@@ -106,7 +106,34 @@ See: `.planning/codebase/` (7 documents, 2,109 lines)
 
 ---
 
-## Phase 7.4 Deliverables
+## Phase 7.5 Deliverables
+
+### Backend
+- **`predict_texts()`** in `services/active_learning.py` — batch prediction for multiple texts with confidence threshold filtering, returns sorted predictions
+- **`AutopilotRequest`** schema in `models/schemas.py` — `count`, `confidence_threshold`, `start_index` parameters
+- **`POST /learning/autopilot`** endpoint — trains on labeled data, batch-predicts for unlabeled reviews, saves annotations, returns annotated count + remaining count
+
+### Frontend
+- **"Otomatik Etiketle" button** in toolbar — calls batch autopilot endpoint, shows loading spinner + "Etiketleniyor..." during execution
+- Success toast: `"{N} inceleme etiketlendi ({M} kaldi)"`
+- Error handling: backend offline → error toast, no crash
+- Arrow key navigation (← →) with settings toggle (completed earlier)
+
+### Tests
+| File | Tests | What it covers |
+|------|-------|----------------|
+| `tests/test_active_learning.py` | 5 new | `predict_texts` — batch prediction, empty input, confidence filtering, None model data, sorted output |
+| `tests/test_learning_routes.py` | 7 new | `POST /learning/autopilot` — happy path, <2 labeled → 400, single labeled → 400, all labeled → annotated=0, count limit, start_index, valid JSON saving |
+
+### Test Results
+- Backend: 236 passed (+12 over Phase 7.4)
+- Frontend: 94 passed (+6 over Phase 7.3)
+
+### Phase 7.5 Summary
+- **Plan 1:** Backend autopilot endpoint (`predict_texts` + `POST /learning/autopilot`) ✅
+- **Plan 2:** Frontend batch autopilot button ("Otomatik Etiketle") ✅
+- **Plan 3:** Integration tests (12 new backend tests + existing frontend autopilot tests) ✅
+- **Plan 4:** 4-way default mode, Tier 1 removed from filter, null-safety, comprehensive tests ✅
 
 ### Frontend
 - **FourWayGrid.tsx**: CSV column names displayed as subtle monospace labels on grid card headers

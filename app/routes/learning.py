@@ -13,7 +13,9 @@ from app.data import load_data
 from services.active_learning import (
     labeled_texts_from_data,
     train_labeled_data,
+    predict_texts,
 )
+from models.schemas import AutopilotRequest
 
 router = APIRouter(tags=["learning"])
 
@@ -98,3 +100,97 @@ def get_learning_predict(data_idx: int):
         })
 
     return predictions
+
+
+@router.post("/learning/autopilot")
+def run_autopilot(request: AutopilotRequest):
+    """Batch auto-annotate unlabeled reviews using the trained ML model.
+
+    Trains TF-IDF + LogisticRegression on all currently labeled reviews,
+    then predicts triplets for unlabeled reviews and saves them.
+
+    Parameters
+    ----------
+    request : AutopilotRequest
+        ``count`` — how many reviews to annotate (default 10).
+        ``confidence_threshold`` — min confidence to accept (default 0.5).
+        ``start_index`` — where to start (None = first unlabeled).
+
+    Returns
+    -------
+    dict
+        ``annotated`` — number of reviews annotated.
+        ``total_unlabeled`` — total unlabeled reviews remaining.
+    """
+    import json
+
+    try:
+        data = load_data()
+        file_type = _get_file_type()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error loading data: {str(e)}")
+
+    texts, label_sets = labeled_texts_from_data(data, file_type)
+
+    labeled_texts = [texts[i] for i in range(len(texts)) if label_sets[i]]
+    labeled_labels = [label_sets[i] for i in range(len(texts)) if label_sets[i]]
+
+    if len(labeled_texts) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Yetersiz etiketlenmis inceleme ({len(labeled_texts)}); en az 2 gerekli.",
+        )
+
+    model_data = train_labeled_data(labeled_texts, labeled_labels)
+    if model_data is None:
+        raise HTTPException(status_code=400, detail="Model egitilemedi — etiketli verileri kontrol edin.")
+
+    # Find unlabeled indices
+    unlabeled_indices = [
+        i for i in range(len(texts))
+        if not label_sets[i]
+        or (file_type == "csv" and data.iloc[i].get("label") is None)
+    ]
+
+    if not unlabeled_indices:
+        return {"annotated": 0, "total_unlabeled": 0, "message": "Etiketlenmemis inceleme kalmadi."}
+
+    # Apply start_index offset
+    start_offset = 0
+    if request.start_index is not None:
+        try:
+            start_offset = next(
+                j for j, idx in enumerate(unlabeled_indices) if idx >= request.start_index
+            )
+        except StopIteration:
+            return {"annotated": 0, "total_unlabeled": len(unlabeled_indices), "message": "Belirtilen indexten sonra etiketlenmemis inceleme yok."}
+
+    target_indices = unlabeled_indices[start_offset:start_offset + request.count]
+
+    if not target_indices:
+        return {"annotated": 0, "total_unlabeled": len(unlabeled_indices)}
+
+    # Predict for all targeted texts at once
+    target_texts = [texts[i] for i in target_indices]
+    predictions_batch = predict_texts(model_data, target_texts, request.confidence_threshold)
+
+    # Save predictions
+    annotated_count = 0
+    for idx, predictions in zip(target_indices, predictions_batch):
+        if predictions:
+            label_json = json.dumps(predictions, ensure_ascii=False)
+            if file_type == "json":
+                data[idx]["label"] = predictions
+            else:
+                data.at[idx, "label"] = label_json
+            annotated_count += 1
+
+    # Persist changes
+    from app.data import save_data
+    save_data(data)
+
+    return {
+        "annotated": annotated_count,
+        "total_unlabeled": len(unlabeled_indices) - min(request.count, len(target_indices)),
+        "message": f"{annotated_count} inceleme etiketlendi.",
+    }
