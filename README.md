@@ -230,3 +230,73 @@ cd frontend && npx vitest run
 ## License
 
 MIT License.
+
+---
+
+## Badges
+
+[![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white)](#)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](#)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](#)
+[![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)](#)
+[![License](https://img.shields.io/badge/License-MIT-green)](#license)
+[![Backend Tests](https://img.shields.io/badge/tests-224_pytest-4B8BBE?logo=pytest&logoColor=white)](#running-tests)
+[![Frontend Tests](https://img.shields.io/badge/tests-94_vitest-6E9F18?logo=vitest&logoColor=white)](#running-tests)
+[![LREC 2026](https://img.shields.io/badge/LREC-2026-800080)](#citation)
+
+---
+
+## Project Status
+
+**Active development — Phase 7.5 (current).** This fork is actively maintained with ongoing improvements. The 4-Way Comparison mode is stable and feature-complete; iterative refinements to the ML prediction pipeline, UI polish, and test coverage continue.
+
+Pull requests are welcome for bug fixes, Turkish NLP integrations, and additional provider support.
+
+---
+
+## Troubleshooting / FAQ
+
+### `setup.bat` fails — missing `@vitejs/plugin-react`
+
+**Problem:** After running `setup.bat`, launching the frontend fails with `ERR_MODULE_NOT_FOUND: Cannot find package '@vitejs/plugin-react'`.
+
+**Root cause:** The system may have `NODE_ENV=production` set, which causes `npm install` to skip `devDependencies` (including `@vitejs/plugin-react`, `vite`, `daisyui`, `tailwindcss`). `setup.bat` now explicitly sets `NODE_ENV=development` and verifies all critical packages post-install.
+
+**Fix:** Re-run `setup.bat` or manually install missing packages:
+```bash
+cd frontend
+set NODE_ENV=development
+npm install
+```
+
+If the issue persists, verify the packages exist on disk:
+```bash
+dir frontend\node_modules\@vitejs\plugin-react
+dir frontend\node_modules\vite
+dir frontend\node_modules\daisyui
+```
+
+### NLP models download on first use
+
+BERT (~1.2 GB) and e5-small (~118 MB) are **lazy-loaded**. The app starts without them. The first time you use Duygu Analizi (sentiment) or Benzerlik Karşılaştırması (similarity), HuggingFace downloads the models — this may take a few minutes with visible server-side progress output.
+
+### `setuptools<75` requirement
+
+Turkish NLP packages (`nlptoolkit-sentinet`, `nlptoolkit-morphologicalanalysis`) use `pkg_resources`, which was removed in setuptools 75+. A version constraint is enforced in `pyproject.toml`. If you get `ModuleNotFoundError: pkg_resources`, run:
+```bash
+pip install 'setuptools<75'
+```
+
+### "0 inceleme etiketlendi" despite labeled reviews
+
+The "Tahmin Et" button trains only on rows where **you** have saved annotations (the `label` column). Model predictions in 4-way columns (`gemma4_31b_label`, etc.) are **not** used as training data. Annotate at least 2 reviews manually before using ML prediction.
+
+---
+
+## Acknowledgements
+
+- **Original AnnoABSA** — Nils Constantin Hellwig, Jakob Fehle, Udo Kruschwitz, and Christian Wolff for the annotation tool presented at LREC 2026
+- **Turkish NLP tools** — [StarlangSoftware](https://github.com/starlangsoftware) for SentiNet, NlpToolkit (morphological analysis), and WordNet
+- **Multilingual embeddings** — [intfloat/multilingual-e5-small](https://huggingface.co/intfloat/multilingual-e5-small) for cross-lingual sentence similarity
+- **BERT Turkish** — [dbmdz/bert-base-turkish-uncased](https://huggingface.co/dbmdz/bert-base-turkish-uncased) for sentiment analysis
+- **LREC 2026** — reviewers and organizers for constructive feedback on the original submission

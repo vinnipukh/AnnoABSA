@@ -56,13 +56,56 @@ if %errorlevel% neq 0 (
 
 REM Install frontend deps
 echo [4/5] Installing frontend dependencies...
+
+REM Remove root node_modules — prevents Vite resolution conflicts
+REM (root package.json is only a convenience wrapper; cli.py handles everything)
+if exist "..\node_modules" (
+    echo [CLEAN] Removing root node_modules to prevent conflicts...
+    rmdir /s /q "..\node_modules" 2>nul
+    del "..\package-lock.json" 2>nul
+)
+
 cd frontend
+
+REM Ensure devDependencies are installed even if NODE_ENV=production
+set NODE_ENV=development
+
 call npm install
 if %errorlevel% neq 0 (
     echo [FAIL] npm install failed
     cd ..
     pause
     exit /b 1
+)
+
+REM Verify critical packages installed (npm install can partially fail)
+set DEPS_OK=1
+if not exist "node_modules\@vitejs\plugin-react" set DEPS_OK=0
+if not exist "node_modules\vite" set DEPS_OK=0
+if not exist "node_modules\daisyui" set DEPS_OK=0
+if not exist "node_modules\tailwindcss" set DEPS_OK=0
+
+if %DEPS_OK% equ 0 (
+    echo [WARN] Critical packages missing - running fixup installs...
+    call npm install @vitejs/plugin-react --save-dev
+    call npm install vite@^5 --save-dev
+    call npm install daisyui@^4 --save-dev
+    call npm install tailwindcss@^3 --save-dev
+    call npm install postcss autoprefixer --save-dev
+    call npm install
+    REM Re-check
+    if not exist "node_modules\@vitejs\plugin-react" (
+        echo [FAIL] Could not install critical packages. Check your network and retry.
+        cd ..
+        pause
+        exit /b 1
+    )
+    if not exist "node_modules\vite" (
+        echo [FAIL] Could not install vite. Check your network and retry.
+        cd ..
+        pause
+        exit /b 1
+    )
 )
 cd ..
 

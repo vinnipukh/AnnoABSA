@@ -75,20 +75,20 @@ describe('ResolutionPanel', () => {
     vi.clearAllMocks();
   });
 
-  /* ─── Tier 1: Auto-Accept (green) ─── */
+  /* ─── Tier 1: Otomatik Kabul (green) ─── */
 
-  it('renders Tier 1 Auto-Accept with green header', () => {
+  it('renders Tier 1 Otomatik Kabul with green header', () => {
     const { container } = render(<ResolutionPanel {...defaultProps} />);
 
     // Should show tier title
-    expect(container.textContent).toContain('Auto-Accept');
+    expect(container.textContent).toContain('Otomatik Kabul');
     // Should show suggestion text
-    expect(container.textContent).toContain('GT triplets match majority consensus');
+    expect(container.textContent).toContain('GT üçlüleri çoğunluk uzlaşmasıyla eşleşiyor');
     // Should show green-ish header (bg-success class applied)
     const headerDiv = container.querySelector('.bg-success\\/10');
     expect(headerDiv).not.toBeNull();
-    // Should show "Tüm modeller uyumlu" badge
-    expect(container.textContent).toContain('Tüm modeller uyumlu');
+    // Should not show the former Tier 1 compatibility badge
+    expect(container.textContent).not.toContain('Tüm modeller uyumlu');
     // Should show majority triplets in diff tracker
     expect(container.textContent).toContain('Manzara');
     expect(container.textContent).toContain('servis');
@@ -104,31 +104,31 @@ describe('ResolutionPanel', () => {
     expect(editBtn).not.toBeNull();
   });
 
-  /* ─── Tier 2: Quick Diff (yellow) ─── */
+  /* ─── Tier 2: Hızlı Fark (yellow) ─── */
 
-  it('renders Tier 2 Quick Diff with yellow header', () => {
+  it('renders Tier 2 Hızlı Fark with yellow header', () => {
     const { container } = render(
       <ResolutionPanel
         {...defaultProps}
         majorityVote={2}
         majorityLabel={majorityTriplets}
         gtTriplets={gtTripletsDiff}
-        originalLlmDiff="Majority says positive, GT says neutral"
+        originalLlmDiff="Çoğunluk positive, GT neutral diyor"
       />
     );
 
     // Should show tier title
-    expect(container.textContent).toContain('Quick Diff');
+    expect(container.textContent).toContain('Hızlı Fark');
     // Should show suggestion text
-    expect(container.textContent).toContain('Consensus found but differs from GT');
+    expect(container.textContent).toContain('Uzlaşma bulundu ancak GT\'den farklı');
     // Should show yellow-ish header
     const headerDiv = container.querySelector('.bg-warning\\/10');
     expect(headerDiv).not.toBeNull();
     // Should show diff text
-    expect(container.textContent).toContain('Majority says positive');
-    // Should show both sides: Majority and GT
-    expect(container.textContent).toContain('Majority');
-    expect(container.textContent).toContain('GT (Original)');
+    expect(container.textContent).toContain('Çoğunluk positive');
+    // Should show both sides: Çoğunluk and GT
+    expect(container.textContent).toContain('Çoğunluk');
+    expect(container.textContent).toContain('GT (Orijinal)');
   });
 
   it('shows three action buttons in Tier 2', () => {
@@ -142,14 +142,14 @@ describe('ResolutionPanel', () => {
     );
 
     // All three button labels should be present
-    expect(container.textContent).toContain('Majority Kabul Et');
+    expect(container.textContent).toContain('Çoğunluğu Kabul Et');
     expect(container.textContent).toContain('GT\'yi Koru');
     expect(container.textContent).toContain('Düzenle');
   });
 
-  /* ─── Tier 3: Manual Review (red) ─── */
+  /* ─── Tier 3: Manuel İnceleme (red) ─── */
 
-  it('renders Tier 3 Manual Review with red header', () => {
+  it('renders Tier 3 Manuel İnceleme with red header', () => {
     const { container } = render(
       <ResolutionPanel
         {...defaultProps}
@@ -160,20 +160,20 @@ describe('ResolutionPanel', () => {
     );
 
     // Should show tier title
-    expect(container.textContent).toContain('Manual Review');
+    expect(container.textContent).toContain('Manuel İnceleme');
     // Should show suggestion text
-    expect(container.textContent).toContain('No consensus');
+    expect(container.textContent).toContain('Uzlaşma yok');
     // Should show red-ish header
     const headerDiv = container.querySelector('.bg-error\\/10');
     expect(headerDiv).not.toBeNull();
     // Should show Turkish message about all 4 models
     expect(container.textContent).toContain('Tüm 4 model');
     expect(container.textContent).toContain('ızgarada');
-    // Should show Manuel Giris button
-    expect(container.textContent).toContain('Manuel Giris');
+    // Should show Manuel Giriş button
+    expect(container.textContent).toContain('Manuel Giriş');
   });
 
-  it('shows manual form when Manuel Giris button clicked in Tier 3', () => {
+  it('shows manual form when Manuel Giriş button clicked in Tier 3', () => {
     const { container } = render(
       <ResolutionPanel
         {...defaultProps}
@@ -183,13 +183,13 @@ describe('ResolutionPanel', () => {
       />
     );
 
-    // Click Manuel Giris button
-    const manualBtn = findByText(container, /Manuel Giris/);
+    // Click Manuel Giriş button
+    const manualBtn = findByText(container, /Manuel Giriş/);
     click(manualBtn);
 
     // Form should now be visible with input fields
-    expect(container.textContent).toContain('ASPECT TERM');
-    expect(container.textContent).toContain('KATEGORI');
+    expect(container.textContent).toContain('ASPECT TERİMİ');
+    expect(container.textContent).toContain('KATEGORİ');
     expect(container.textContent).toContain('KUTUP');
     // Form should have +P, -N, =N buttons
     expect(container.textContent).toContain('+P');
@@ -215,7 +215,7 @@ describe('ResolutionPanel', () => {
     expect(onAccept).toHaveBeenCalledWith(gtTriplets);
   });
 
-  it('calls onAcceptSuggestion with majorityLabel when Majority Kabul Et clicked in Tier 2', () => {
+  it('calls onAcceptSuggestion with majorityLabel when Çoğunluğu Kabul Et clicked in Tier 2', () => {
     const onAccept = vi.fn();
     const { container } = render(
       <ResolutionPanel
@@ -227,8 +227,8 @@ describe('ResolutionPanel', () => {
       />
     );
 
-    // Find "Majority Kabul Et" button specifically
-    const majorityBtn = findByText(container, /^Majority Kabul Et$/);
+    // Find "Çoğunluğu Kabul Et" button specifically
+    const majorityBtn = findByText(container, /^Çoğunluğu Kabul Et$/);
     click(majorityBtn);
 
     expect(onAccept).toHaveBeenCalledTimes(1);
@@ -289,7 +289,7 @@ describe('ResolutionPanel', () => {
     );
 
     // Open manual form
-    const manualBtn = findByText(container, /Manuel Giris/);
+    const manualBtn = findByText(container, /Manuel Giriş/);
     click(manualBtn);
 
     // Find aspect term input and type in it
@@ -301,7 +301,7 @@ describe('ResolutionPanel', () => {
     input.dispatchEvent(new Event('input', { bubbles: true }));
 
     // Find submit button and click
-    const submitBtn = findByText(container, '+ Triplet Ekle');
+    const submitBtn = findByText(container, '+ Üçlü Ekle');
     click(submitBtn);
 
     expect(onAdd).toHaveBeenCalledTimes(1);
@@ -313,7 +313,7 @@ describe('ResolutionPanel', () => {
   /* ─── Diff tracker text ─── */
 
   it('shows original_llm_diff text in Tier 2 Diff Tracker', () => {
-    const diffText = 'Majority says Manzara=positive vs GT=neutral — aspect mismatch detected';
+    const diffText = 'Çoğunluk Manzara=positive, GT=neutral — görünüm uyuşmazlığı algılandı';
     const { container } = render(
       <ResolutionPanel
         {...defaultProps}
@@ -324,8 +324,8 @@ describe('ResolutionPanel', () => {
       />
     );
 
-    expect(container.textContent).toContain('Majority says Manzara');
-    expect(container.textContent).toContain('aspect mismatch detected');
+    expect(container.textContent).toContain('Çoğunluk Manzara');
+    expect(container.textContent).toContain('görünüm uyuşmazlığı algılandı');
   });
 
   it('shows manual triplets list with remove button', () => {
@@ -346,14 +346,14 @@ describe('ResolutionPanel', () => {
     );
 
     // Open manual form
-    const manualBtn = findByText(container, /Manuel Giris/);
+    const manualBtn = findByText(container, /Manuel Giriş/);
     click(manualBtn);
 
     // Manual triplet should be visible
     expect(container.textContent).toContain('yemek');
 
     // Find and click remove button (close icon area)
-    const removeBtn = container.querySelector('button[title="Remove triplet"]');
+    const removeBtn = container.querySelector('button[title="Üçlüyü kaldır"]');
     expect(removeBtn).not.toBeNull();
     click(removeBtn);
 
