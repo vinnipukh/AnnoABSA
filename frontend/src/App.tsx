@@ -756,8 +756,8 @@ export default function App() {
         <section className="flex-1 min-h-0">
           {mode === 'compare' ? (
             settings.compare_mode === '4way' && currentData.gt_triplets ? (
-              <div className="h-full flex gap-3">
-                <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+              <div className="h-full flex flex-col gap-3">
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                   <ReviewHeader
                     reviewText={currentData.review_text}
                     translation={currentData.translation}
@@ -784,7 +784,7 @@ export default function App() {
                     />
                   </div>
                 </div>
-                <div className="w-[280px] flex-shrink-0">
+                <div className="flex-shrink-0">
                   <ResolutionPanel
                     majorityVote={currentData.majority_vote || 0}
                     majorityLabel={(currentData as any).majority_label || []}

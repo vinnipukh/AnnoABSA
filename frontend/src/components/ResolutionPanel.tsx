@@ -169,7 +169,7 @@ export const ResolutionPanel: React.FC<ResolutionPanelProps> = ({
   `;
 
   return (
-    <div className={`w-[300px] flex-shrink-0 flex flex-col h-full rounded-2xl border ${tc.border} ${tc.bg} p-3 shadow-xl backdrop-blur-sm overflow-hidden`}>
+    <div className={`w-full flex-shrink-0 flex flex-col rounded-2xl border ${tc.border} ${tc.bg} p-3 shadow-xl backdrop-blur-sm overflow-hidden`}>
       <style>{motionStyles}</style>
 
       {/* ── Tier Header ── */}
